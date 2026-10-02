@@ -1205,11 +1205,12 @@ PWA 手机体验优化
    node supabase/run-sql.mjs supabase/migrations/0004_member_management.sql
    node supabase/run-sql.mjs supabase/migrations/0005_owner_transfer.sql
    node supabase/run-sql.mjs supabase/migrations/0006_seafood_subcategory.sql
+   node supabase/run-sql.mjs supabase/migrations/0007_cancel_and_move_order.sql
 ⑤ node supabase/run-sql.mjs supabase/seed.sql
 ⑥ 通知 PostgREST 重载 schema 缓存：
      notify pgrst, 'reload schema';
      ↑ 不做这步，/rest/v1/rpc/* 会返回 404 "requested path is invalid"
-⑦ node supabase/verify.mjs --write     只读 17 项，加 --write 走写链路共 18 项，全绿才算通
+⑦ node supabase/verify.mjs --write     只读 24 项，加 --write 走写链路共 25 项，全绿才算通
 ⑧ 建 GitHub 仓库并推送，配 4 项 Actions Secrets/Variables，手动 Run 一次 workflow
 ```
 
@@ -1342,7 +1343,7 @@ supabase rpc random_table(people, meal_type)
 | `supabase/migrations/0002_family_id_default.sql` | 已执行 |
 | `supabase/seed.sql` | 已执行，30 道菜 + 11 条历史订单 |
 | Storage `dish-images` | 11 张菜品插画已上传并回填 `image_path`，剩 19 道待家人实拍 |
-| `supabase/verify.mjs` | 只读 17 项全绿；加 `--write` 走 confirm 链路共 18 项（含 RLS 隔离、随机权重、成员守卫、管理员移交、confirm 幂等）。**跑完自动删掉本次的匿名身份**，不再往示范家庭堆陌生成员；要看现场加 `--keep-session` |
+| `supabase/verify.mjs` | 只读 24 项；加 `--write` 共 25 项（含 RLS 隔离、随机权重、成员守卫、管理员移交、取消/挪动、confirm 幂等）。**跑完自动删掉本次的匿名身份**，不再往示范家庭堆陌生成员；要看现场加 `--keep-session`。⚠ 其中 §37.13 那 7 项**没通过 HTTP 跑过**（当时本机代理没监听），是用等效的 SQL 探针验的，代理恢复后补跑一次 |
 | `.github/workflows/keepalive.yml` | **已上线并跑通**：首次手动运行 `conclusion=success`，PostgREST 返回 200，心跳提交已由 `keepalive-bot` 推回仓库 |
 | GitHub 仓库 | `oqdbpo/family-menu`，**public**（Pages 免费档不支持私有库），main 分支 |
 | GitHub Pages | **已上线** `https://oqdbpo.github.io/family-menu/`；`deploy-web` run #1 success；强制直连实测首页 / manifest / sw.js / 图标 / JS 主包全部 200 |
@@ -1395,8 +1396,9 @@ supabase rpc random_table(people, meal_type)
 **第一次加菜才建单**，`order.value.id` 为 null 表示"还没落库的虚拟草稿"；
 把最后一道菜移除时也会顺手删掉这条空草稿。
 
-**已确认的餐是历史，锁死不可改。** 确认之后 `eat_count` 已经回写，再往里加菜会让
-计数和点餐记录对不上（实测发生过：一笔已确认的晚餐被追加到 9 道菜）。
+**已确认的餐是历史，锁死不可改。** ← 这条已由 §37.13 改为「可取消」，
+保留下面这段是因为它记的是**为什么要有锁**：确认之后 `eat_count` 已经回写，
+再往里加菜会让计数和点餐记录对不上（实测发生过：一笔已确认的晚餐被追加到 9 道菜）。
 所以 `setQty()` 里有一道锁，且**必须放在 `ensureOrder()` 之后判断**——
 页面刚进来时 `order.value` 还是 null，提前判断会让第一次点击绕过锁定，这个坑实测踩过两次。
 UI 上的表现：已确认的订单不再显示步进器和删除按钮，改成只读的 `× N` 徽章，
@@ -1584,6 +1586,63 @@ npx vite                      # 终端 2
 `sort` 各占一段号，别乱塞：一级分类 1~6，火锅细分 301~，荤菜细分从 101 起。
 第一次写的时候把「其他海鲜」放成 sort=2 并顺手顺延了素菜/火锅，
 结果 火锅 和 汤 挤成同一个 sort=4，把分类胶囊的顺序打乱了——已回退。
+
+
+## 37.13 取消已确认的一顿，以及挪餐次/日期（0007）
+
+这条**推翻了 §37.7 里「已确认的餐是历史，锁死不可改」那一条**。原来的判断只对了一半：
+真正不能改的是"算错的统计"，不是"状态"。所以这不是把锁松开，
+而是让"取消"这条路把统计重算干净——确认依然冻结编辑，只是冻结变得可逆。
+
+```text
+cancel_order(uuid)   退回草稿 + 全量重算统计。只允许今天及以后
+move_order(uuid, date, meal)   只挪草稿；撞车就拒绝并点名是哪一顿
+refresh_family_stats(uuid)     内部 helper，anon/authenticated 无执行权
+```
+
+**顺手收掉一个双真相源**：`confirm_order` 原来是增量 `+1`，而 `seed.sql` 是全量重算，
+同一件事两套算法，任一处漏跑就永久对不上（和 §37.10.2 的 owner_uid/role 是同一类病）。
+现在 confirm 和 cancel 都走 `refresh_family_stats()`，只有一处算数。
+它必须 `left join` 全量覆盖：只 update 命中行的写法，会让"历史被取消干净"的菜永远停在 1。
+
+三条规则全部在数据库把关，前端只是让按钮长相对：
+
+| 场景 | 结果 |
+|---|---|
+| 取消今天/以后 | 退回草稿，删菜、清空、挪餐次全部恢复可用 |
+| 取消以前吃过的顿 | `9月11日那顿是吃过的历史，不能取消` |
+| 已确认直接挪 | `先取消确认，再挪这一顿` |
+| 挪到已有单的位置 | `10月3日午餐已经有一单了，先去那单里调整或清空，再来挪`（**不自动合并**） |
+
+**时区留了一天宽限，别当 bug 查**：Supabase 会话时区是 UTC，而 `meal_date` 是家里人
+日历上的日期。北京时间 00:00–08:00 之间"昨天"在服务端还没跨天，那几个小时里昨天的顿
+还能取消。放宽的方向是安全的（顶多多给一次反悔），比在通用 schema 里写死
+`Asia/Shanghai` 合适。自检里那条过去日期断言因此取"前天或更早"，避免时好时坏。
+
+### 37.13.1 这次的验证没走 HTTP，原因值得记
+
+本机代理当时没在监听，`*.supabase.co` 直连被 reset，所以 `verify.mjs` 新增的 6 条断言
+**一条都没通过 HTTP 跑过**。改用一个 SQL 探针绕过：造一个临时 `auth.users` 身份
+（`auth.users` 只有 `id` 是必填无默认）+ 一条 DEMO01 成员行，然后
+`set local role authenticated` 加 `set local request.jwt.claims` 让 `auth.uid()` 真的生效，
+九个断言全绿，跑完在同一批次里 `reset role` + 删掉自己造的东西。
+
+两个坑：临时表在 `pg_temp` 里，切到 `authenticated` 之后写不进去（42501），
+要先 `grant insert on table pg_temp.t_res to authenticated`；
+探针里"整户快照一致"这条通过时也会把 note 字段原样打出来，看着像矛盾，别被骗。
+
+关键那条断言是：**取消后 `红烧排骨` 退回 `1 / 2026-10-01 09:48:50.683631+00`**，
+连旧的时间戳都复原了——这是任何 `-1` 式增量写法永远做不到的。
+全户 md5 校验和跑完仍是 `3035cf3cb7cb72eba6e36a6b226faca9`，与动手前逐字相同。
+
+被这个探针覆盖不到的是 HTTP/outbox 那一层（supabase-js 的 rpc 调用与离线队列）。
+那层代码与 `confirm_order` 走的是同一条已验证过的路径，但严格说**没为新函数跑过**。
+代理恢复后补一次 `node supabase/verify.mjs` 才算全绿。
+
+顺带一个当时的误判，记下来防重犯：探针跑完发现库里多了 1 个身份、1 条成员、1 笔未来订单，
+第一反应是自己的清理没做干净。查下来全是**用户当时正在真机使用**留下的数据
+（`小确幸` 里那笔 `10-03 早餐 confirmed` 就是他想取消的那一顿）。
+清理脚本前先分清"我造的"和"别人正在用的"，判据用 created_at 和归属家庭，别靠猜。
 
 
 ---
