@@ -38,7 +38,8 @@
 
     <div v-if="order.locked" class="pad"><div class="banner info" style="margin-top:10px">
       <Ic name="check" :size="16" /><div><b>「{{ order.mealType }}」已确认</b>
-        这一顿已经写进历史，不能再改。换个餐次或翻到别的日期就能继续点。</div>
+        {{ order.canCancel ? '点右下角「取消点餐」就能退回草稿：删菜、换餐次、改日期都可以。吃过的顿才是不能动的历史。'
+                            : '这一顿是吃过的历史，不能改。要挪菜请点别的日期。' }}</div>
     </div></div>
 
     <div v-if="notice" class="pad"><div class="banner warn" style="margin-top:10px">
@@ -65,6 +66,27 @@
         </div>
       </template>
 
+      <div v-if="order.isDraft && order.order?.id && order.count" class="pad" style="margin-top:12px">
+        <div class="card" style="padding:12px 14px">
+          <button class="btn xs g blk" style="justify-content:center" @click="toggleMove">
+            <Ic name="swap" :size="13" />{{ moveOpen ? '收起「挪这顿」' : '这顿挪到别的餐次 / 日期' }}
+          </button>
+          <div v-if="moveOpen" style="margin-top:13px">
+            <div class="hint" style="margin-bottom:6px">餐次</div>
+            <div class="chips">
+              <button v-for="t in mealTypes" :key="t" type="button" class="chip"
+                      :class="{ on: t === toMeal }" @click="toMeal = t">{{ t }}</button>
+            </div>
+            <div class="hint" style="margin:11px 0 6px">日期 · 今天及以后</div>
+            <input v-model="toDate" type="date" :min="todayStr" class="inp mono" style="height:34px;padding:0 10px">
+            <div class="hint" style="margin-top:11px">目标位置已经有别的一顿时会说清楚是哪一顿，不会偷偷合并。</div>
+            <button class="btn p sm blk" style="margin-top:10px" :disabled="busy || unchanged" @click="doMove">
+              <Ic name="check" :size="14" />{{ unchanged ? '选个新的餐次或日期' : '挪过去' }}
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div v-if="order.isDraft && order.count" class="pad" style="margin-top:16px">
         <button class="btn o sm blk" :style="armed ? 'color:var(--danger);box-shadow:inset 0 0 0 1.5px var(--danger)' : ''"
                 @click="clear">
@@ -88,11 +110,15 @@
 
     <div class="dock">
       <div class="sum"><b>{{ order.isDraft ? '草稿 · 未确认' : '已确认' }}</b>
-        <em>{{ order.isDraft ? '确认后写入历史 · eat_count +1' : '已完成的一顿' }}</em></div>
+        <em>{{ order.isDraft ? '确认后写入历史 · eat_count +1' : (order.canCancel ? '点右下角可退回草稿' : '吃过的顿是历史') }}</em></div>
       <RouterLink to="/random" class="iconbtn" style="width:42px;height:42px" aria-label="随机换一道"><Ic name="dice" /></RouterLink>
-      <button class="btn p" :disabled="!order.isDraft || busy" @click="confirm">
+      <button v-if="order.isDraft" class="btn p" :disabled="!order.count || busy" @click="confirm">
         <Ic name="check" />{{ busy ? '提交中…' : '确认点餐' }}
       </button>
+      <button v-else-if="order.canCancel" class="btn o" :disabled="busy" @click="cancel">
+        <Ic name="x" />{{ busy ? '处理中…' : '取消点餐' }}
+      </button>
+      <button v-else class="btn g" disabled>已吃过</button>
     </div>
   </div>
 </template>
@@ -177,6 +203,36 @@ async function confirm() {
   busy.value = false;
   if (r.error) notice.value = r.error.message || String(r.error);
   else if (r.queued) notice.value = '现在没网，确认操作已存在本机，联网后自动提交';
+}
+
+async function cancel() {
+  busy.value = true; notice.value = '';
+  const r = await order.cancel();
+  busy.value = false;
+  if (r.error) notice.value = r.error.message || String(r.error);
+  else if (r.queued) notice.value = '现在没网，取消操作已存在本机，联网后自动执行';
+}
+
+// 挪这一顿。默认展开时回填当前所在位置，这样"没改任何东西"时按钮是灰的，
+// 不会出现点一下挪到它本来就在的地方
+const moveOpen = ref(false);
+const toMeal = ref('');
+const toDate = ref('');
+const unchanged = computed(() => toMeal.value === order.order?.meal_type && toDate.value === order.order?.meal_date);
+
+function toggleMove() {
+  moveOpen.value = !moveOpen.value;
+  if (moveOpen.value) { toMeal.value = order.order?.meal_type; toDate.value = order.order?.meal_date; }
+}
+
+async function doMove() {
+  busy.value = true; notice.value = '';
+  const r = await order.moveTo(toDate.value, toMeal.value);
+  busy.value = false;
+  if (r.error) { notice.value = r.error.message || String(r.error); return; }
+  moveOpen.value = false;
+  notice.value = r.queued ? '现在没网，挪动已存在本机，联网后自动执行'
+                          : `已挪到 ${toDate.value} · ${toMeal.value}`;
 }
 
 async function cast(p) {

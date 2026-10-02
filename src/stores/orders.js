@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import { todayISO, getOrderByMeal, ensureDraft, loadOrder, setItemQuantity, confirmOrder, recentHistory } from '../services/orders';
+import { todayISO, getOrderByMeal, ensureDraft, loadOrder, setItemQuantity,
+         confirmOrder, cancelOrder, moveOrder, recentHistory } from '../services/orders';
 import { submit } from '../lib/db';
 import { classifyError } from '../config';
 
@@ -27,9 +28,12 @@ export const useOrderStore = defineStore('order', () => {
   });
   const qtyOf = dishId => items.value.find(i => i.dish_id === dishId)?.quantity || 0;
   const isDraft = computed(() => !order.value?.id || order.value.status === 'draft');
-  // 确认之后这顿就是历史了。之前没有拦，实测真被追加过 8 道菜，
-  // 结果 eat_count 和点餐记录对不上。
+  // 确认之后这顿暂时冻结，直到按「取消点餐」退回草稿。
+  // 之前没有拦，实测真被追加过 8 道菜，结果 eat_count 和点餐记录对不上。
   const locked = computed(() => !!order.value?.id && order.value.status !== 'draft');
+  // 只有今天及以后能取消：吃过的顿是历史，改它等于回头改写统计。
+  // 数据库里（0007）有同一道闸，这里只决定按钮长什么样，不是防护
+  const canCancel = computed(() => locked.value && order.value.meal_date >= todayISO());
 
   // 只是「看」一眼今日点餐不应该在库里留行 —— 建单推迟到第一次加菜。
   // 之前 ensureDraft 挂在 load 上，光是浏览页面就会攒出一堆空草稿。
@@ -80,7 +84,7 @@ export const useOrderStore = defineStore('order', () => {
       // 锁必须在 ensureOrder 之后判：order.value 刚进页面时是 null，
       // 提前判会让第一次点击绕过锁定（实测确实绕过过）
       if (o.status !== 'draft') {
-        return { queued: false, error: new Error(`「${o.meal_type}」已确认，不能再改；换个餐次或日期再点`) };
+        return { queued: false, error: new Error(`「${o.meal_type}」已确认，先点下面的「取消点餐」再改`) };
       }
       const r = await setItemQuantity(o, dish, n);
       if (!r.error) {
@@ -117,11 +121,33 @@ export const useOrderStore = defineStore('order', () => {
     } catch (e) { return { queued: false, error: e }; }
   }
 
+  async function cancel() {
+    if (!order.value?.id) return { queued: false, error: new Error('这顿还没落库') };
+    try {
+      const r = await cancelOrder(order.value);
+      if (!r.error) await load();     // 重读而不是本地改 status：统计变了，以库为准
+      return r;
+    } catch (e) { return { queued: false, error: e }; }
+  }
+
+  // 挪完跟着视图走到新位置，否则用户看到的还是原来那个空槽，以为没挪成功。
+  // 参数刻意叫 d / t：跟 setDate / setMealType 一致，也避免和上面那两个 ref 重名
+  async function moveTo(d, t) {
+    const o = order.value;
+    if (!o?.id) return { queued: false, error: new Error('这顿还没落库，不用挪') };
+    try {
+      const r = await moveOrder(o, d, t);
+      if (!r.error) { date.value = d; mealType.value = t; await load(); }
+      return r;
+    } catch (e) { return { queued: false, error: e }; }
+  }
+
   async function loadHistory(limit = 30) {
     try { history.value = await recentHistory(limit); }
     catch (e) { error.value = classifyError(e); }
   }
 
-  return { date, mealType, order, order_items: items, items, count, totalMinutes, qtyOf, isDraft, locked,
-           loading, error, history, load, setMealType, setDate, add, setQty, clearAll, confirm, loadHistory };
+  return { date, mealType, order, order_items: items, items, count, totalMinutes, qtyOf, isDraft, locked, canCancel,
+           loading, error, history, load, setMealType, setDate, add, setQty, clearAll,
+           confirm, cancel, moveTo, loadHistory };
 });

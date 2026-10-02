@@ -71,6 +71,22 @@ export async function confirmOrder(order) {
   return r;
 }
 
+// 取消确认：退回草稿。统计由数据库里的 refresh_family_stats() 全量重算，
+// 前端不做任何 +1/-1 的补偿——那样又是第二个算数的地方
+export async function cancelOrder(order) {
+  const r = await submit({ type: 'rpc', fn: 'cancel_order', args: { p_order: order.id } }, { label: '取消点餐' });
+  if (!r.error) order.status = 'draft';
+  return r;
+}
+
+// 挪餐次/日期。只挪草稿，撞车由数据库拒绝并把话说清楚
+export async function moveOrder(order, date, mealType) {
+  return submit({
+    type: 'rpc', fn: 'move_order',
+    args: { p_order: order.id, p_date: date, p_meal_type: mealType },
+  }, { label: `挪到 ${date} ${mealType}` });
+}
+
 export async function recentHistory(limit = 30) {
   const { data: orders, error } = await sb.from('meal_orders')
     .select('id,meal_date,meal_type,status,confirmed_at')

@@ -288,7 +288,102 @@ try {
   }
 }
 
-// ---------- 9. 可选：确认点餐全链路 ----------
+// ---------- 9. 反悔链路：确认→取消 要把全户统计一分不差地退回去 ----------
+// 这是新加的不变量。单看某一道菜的 +1 / -1 是不够的：统计的正确性标准是
+// "退回去之后和从没动过一样"，所以整户 eat_count + last_eaten_at 逐个比对。
+// 挑一道**本来就有历史**的菜，才能验证 last_eaten_at 退回的是旧的时间戳 ——
+// 纯增量 -1 的写法永远做不到这件事。
+{
+  const iso = d => d.toISOString().slice(0, 10);
+  const tomorrow = iso(new Date(Date.now() + 864e5));
+  const made = [];
+  const snap = () => call('/rest/v1/dishes?select=id,eat_count,last_eaten_at&order=id.asc', { auth: true })
+    .then(r => JSON.stringify(r.map(x => `${x.id}=${x.eat_count}/${x.last_eaten_at ?? ''}`)));
+  try {
+    const zero0 = await snap();
+    const pool = await call('/rest/v1/dishes?select=id,name,category,eat_count,last_eaten_at&order=last_eaten_at.desc.nullslast&limit=1', { auth: true });
+    const dish = pool[0];
+
+    const mk = async (meal) => {
+      const id = crypto.randomUUID();
+      await call('/rest/v1/meal_orders', {
+        method: 'POST', auth: true,
+        body: [{ id, meal_date: tomorrow, meal_type: meal, status: 'draft' }],
+      });
+      made.push(id);
+      return id;
+    };
+
+    const o1 = await mk('晚餐');
+    await call('/rest/v1/meal_order_items', {
+      method: 'POST', auth: true,
+      body: [{ order_id: o1, dish_id: dish.id, quantity: 1, category: dish.category }],
+    });
+
+    await call('/rest/v1/rpc/confirm_order', { method: 'POST', body: { p_order: o1 }, auth: true });
+    const mid = await call(`/rest/v1/dishes?select=eat_count,last_eaten_at&id=eq.${dish.id}`, { auth: true });
+    say('确认后该菜 +1 且 last_eaten_at 变成现在',
+        mid[0].eat_count === dish.eat_count + 1 && mid[0].last_eaten_at !== dish.last_eaten_at,
+        `${dish.name} ${dish.eat_count} → ${mid[0].eat_count}`);
+
+    await call('/rest/v1/rpc/cancel_order', { method: 'POST', body: { p_order: o1 }, auth: true });
+    say('取消确认后全户统计逐字退回原状', (await snap()) === zero0,
+        '整户 eat_count / last_eaten_at 全量比对不一致');
+
+    await call('/rest/v1/rpc/cancel_order', { method: 'POST', body: { p_order: o1 }, auth: true });
+    say('取消是幂等的（再点一次不报错也不动数字）', (await snap()) === zero0);
+
+    // 过去那一顿是历史，数据库必须拦住，不能只靠前端不给按钮。
+    // 取"前天或更早"而不是"昨天"：Supabase 会话时区是 UTC，家里是 UTC+8，
+    // 北京时间 00:00–08:00 之间"昨天"在服务端还没跨天，用它做断言会时好时坏。
+    const hist = await call('/rest/v1/meal_orders?select=id,meal_date,status&status=eq.confirmed&order=meal_date.asc&limit=40', { auth: true });
+    const cutoff = iso(new Date(Date.now() - 2 * 864e5));
+    const past = hist.find(x => x.meal_date <= cutoff);
+    let pastErr = '';
+    if (past) {
+      try { await call('/rest/v1/rpc/cancel_order', { method: 'POST', body: { p_order: past.id }, auth: true }); }
+      catch (e) { pastErr = e.message; }
+      say('取消以前吃过的顿 → 被数据库拒绝', /历史/.test(pastErr), pastErr || `${past.meal_date} 竟然能取消`);
+    } else {
+      console.log('  SKIP  过去日期的守卫（这个家没有两天以上的历史订单可试）');
+    }
+
+    // 挪到空位可以，挪到已有单的位置要说清原因
+    const o2 = await mk('午餐');
+    await call('/rest/v1/rpc/move_order',
+      { method: 'POST', body: { p_order: o2, p_date: tomorrow, p_meal_type: '晚餐' }, auth: true });
+    const moved = await call(`/rest/v1/meal_orders?select=id,meal_type&meal_date=eq.${tomorrow}&order=created_at`, { auth: true });
+    say('草稿可以挪到别的餐次',
+        moved.some(x => x.id === o1) === false && moved.some(x => x.id === o2 && x.meal_type === '晚餐'),
+        moved.map(x => `${x.meal_type}`).join('+'));
+
+    const o3 = await mk('早餐');
+    let clash = '';
+    try {
+      await call('/rest/v1/rpc/move_order',
+        { method: 'POST', body: { p_order: o3, p_date: tomorrow, p_meal_type: '晚餐' }, auth: true });
+    } catch (e) { clash = e.message; }
+    say('挪到已有单的位置 → 拒绝并点名是哪一顿', /已经有一单/.test(clash), clash || '没报错，两单被并了');
+
+    // 已确认的不许挪，必须先取消——"确认即冻结"这条留着
+    await call('/rest/v1/rpc/confirm_order', { method: 'POST', body: { p_order: o3 }, auth: true });
+    let frozen = '';
+    try {
+      await call('/rest/v1/rpc/move_order',
+        { method: 'POST', body: { p_order: o3, p_date: tomorrow, p_meal_type: '早餐' }, auth: true });
+    } catch (e) { frozen = e.message; }
+    await call('/rest/v1/rpc/cancel_order', { method: 'POST', body: { p_order: o3 }, auth: true });
+    say('已确认的顿不能直接挪，得先取消', /先取消确认/.test(frozen), frozen || '没报错');
+  } catch (e) {
+    say('反悔链路', false, e.message);
+  } finally {
+    for (const id of made) {
+      await call(`/rest/v1/meal_orders?id=eq.${id}`, { method: 'DELETE', auth: true }).catch(() => {});
+    }
+  }
+}
+
+// ---------- 10. 可选：确认点餐全链路 ----------
 if (WRITE_TEST) {
   const DEMO_FAMILY = '11111111-1111-1111-1111-111111111111';
   const today = new Date().toISOString().slice(0, 10);
@@ -332,7 +427,7 @@ if (WRITE_TEST) {
   console.log('  SKIP  确认点餐全链路（加 --write 开启，会往示范家庭写一条记录）');
 }
 
-// ---------- 10. 自清理：删掉本次创建的所有匿名身份 ----------
+// ---------- 11. 自清理：删掉本次创建的所有匿名身份 ----------
 // 第 2 项检查的前提是"这个会话还没加入任何家庭"，所以每轮都必须新签一个身份，
 // 不能复用缓存 token。代价是不管的话，示范家庭里会一路堆陌生成员
 // （实测几轮下来攒了 4 个"新成员/自检设备"）。默认自己擦干净；
