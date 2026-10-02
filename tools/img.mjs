@@ -104,11 +104,21 @@ const files = target => fs.statSync(target).isDirectory()
   : [target];
 
 /* ------------------------------ commands ------------------------------ */
+function centerCrop(img, w, h, frac) {
+  const side = Math.floor(Math.min(w, h) * frac);
+  const x0 = Math.floor((w - side) / 2), y0 = Math.floor((h - side) / 2);
+  const out = Buffer.alloc(side * side * 4);
+  for (let y = 0; y < side; y++) {
+    img.copy(out, y * side * 4, ((y0 + y) * w + x0) * 4, ((y0 + y) * w + x0 + side) * 4);
+  }
+  return { data: out, side };
+}
+
 const [, , cmd, target, ...rest] = process.argv;
 const arg = (n, d) => { const i = rest.indexOf(`--${n}`); return i >= 0 ? rest[i + 1] : d; };
 
 if (!cmd || !target) {
-  console.error('用法：node tools/img.mjs resize <文件或目录> [--to 760] [--out 目录]\n          node tools/img.mjs bg <文件或目录> [--target F4F1E9]');
+  console.error('用法：node tools/img.mjs resize <文件或目录> [--to 760] [--crop 0.78] [--out 目录]\n          node tools/img.mjs bg <文件或目录> [--target F4F1E9]');
   process.exit(1);
 }
 
@@ -116,10 +126,18 @@ for (const f of files(target)) {
   const { w, h, data } = decode(fs.readFileSync(f));
   let out = data, nw = w, nh = h, note = `${w}x${h}`;
 
+  // 先中心裁方再缩放：做 app 图标时不去掉四周留白，缩小后主体会糊成一团
+  const frac = Number(arg('crop', 0));
+  if (frac > 0 && frac < 1) {
+    const c = centerCrop(out, nw, nh, frac);
+    out = c.data; nw = c.side; nh = c.side;
+    note = `裁方 ${Math.round(frac * 100)}% → ${nw}`;
+  }
+
   if (cmd === 'resize') {
     const cap = Number(arg('to', 760));
-    const s = Math.min(1, cap / Math.max(w, h));
-    if (s < 1) { nw = Math.round(w * s); nh = Math.round(h * s); out = resize(data, w, h, nw, nh); }
+    const s = Math.min(1, cap / Math.max(nw, nh));
+    if (s < 1) { const sw = nw, sh = nh; nw = Math.round(nw * s); nh = Math.round(nh * s); out = resize(out, sw, sh, nw, nh); }
   }
 
   const bg = borderMedian(out, nw, nh);

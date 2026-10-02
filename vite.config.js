@@ -15,8 +15,10 @@ export default defineConfig(({ mode }) => {
       vue(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['icons/icon-192.png', 'icons/icon-512.png'],
+        includeAssets: ['icons/apple-touch-icon.png', 'icons/icon-192.png', 'icons/icon-512.png'],
         manifest: {
+          // Pages 部署在 /family-menu/ 子路径下，这里必须用相对值。
+          // 写成 '/' 会让 PWA 启动时跳到仓库根目录，白屏
           id: './',
           name: '家庭点餐系统',
           short_name: '今天吃什么',
@@ -26,10 +28,12 @@ export default defineConfig(({ mode }) => {
           orientation: 'portrait',
           background_color: '#F4F1E9',
           theme_color: '#F4F1E9',
+          start_url: './',
+          scope: './',
           icons: [
             { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
             { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
-            { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+            { src: 'icons/maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
           ],
         },
         workbox: {

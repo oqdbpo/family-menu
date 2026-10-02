@@ -1,0 +1,75 @@
+# =============================================================================
+# 前端部署到 GitHub Pages
+#
+# 关键点：
+#   · 后端地址在构建时注入，不进仓库。VITE_SB_ANON_KEY 用的是 publishable key，
+#     它会被打进公开的 JS 里 —— 这是 Supabase 的设计意图（配合 RLS 保护数据），
+#     但绝不能把 sb_secret_... / service_role 放进来。
+#   · Pages 在 /family-menu/ 子路径下，vite.config 用 base:'./' + hash 路由，
+#     所以刷新子页面不会 404（GitHub Pages 没有 SPA rewrite）。
+#   · 需要仓库 Settings → Pages → Source 选 "GitHub Actions"（脚本会自动设）。
+# =============================================================================
+name: deploy-web
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      - name: 注入后端地址
+        run: |
+          {
+            echo "VITE_SB_URL=${{ vars.SB_URL }}"
+            echo "VITE_SB_ANON_KEY=${{ secrets.SB_ANON_KEY }}"
+            echo "VITE_DEMO_INVITE=DEMO01"
+          } > .env.production
+          # 构建期自检：地址没注入就当场失败，别推出一个只能白屏的站点
+          grep -q "VITE_SB_URL=https" .env.production || { echo "::error::SB_URL 为空，检查 Actions Variables"; exit 1; }
+
+      - run: npm run build
+
+      - name: 产物自检
+        run: |
+          test -f dist/index.html || { echo "::error::缺 index.html"; exit 1; }
+          test -f dist/sw.js      || { echo "::error::缺 Service Worker，PWA 不会生效"; exit 1; }
+          test -f dist/manifest.webmanifest || { echo "::error::缺 manifest"; exit 1; }
+          grep -q '"src":"icons/icon-512.png"' dist/manifest.webmanifest \
+            || { echo "::error::manifest 图标缺失"; exit 1; }
+          echo "产物 OK：$(du -sh dist | cut -f1)"
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
