@@ -1322,8 +1322,33 @@ supabase rpc random_table(people, meal_type)
 | `supabase/seed.sql` | 已执行，30 道菜 + 11 条历史订单 |
 | Storage `dish-images` | 11 张菜品插画已上传并回填 `image_path`，剩 19 道待家人实拍 |
 | `supabase/verify.mjs` | 10 项全绿（含 RLS 隔离、随机权重、confirm 幂等） |
-| `.github/workflows/keepalive.yml` | **未执行**，等仓库推上去后手动 Run 验证 |
+| `.github/workflows/keepalive.yml` | **已上线并跑通**：首次手动运行 `conclusion=success`，PostgREST 返回 200，心跳提交已由 `keepalive-bot` 推回仓库 |
+| GitHub 仓库 | `oqdbpo/family-menu`（**private**），main 分支，70 个跟踪文件 / 约 7 MB |
+| Actions Secrets & Variables | `SB_ANON_KEY` `SB_MGMT_TOKEN`（Secrets）+ `SB_URL` `SB_PROJECT_REF`（Variables）全部写入 |
+| `design/_raw/` | **不进仓库**（17 MB 未处理原件，本地保留；`design/assets/` 才是产物） |
 | `src/` Vue 3 前端 | 6 个页面 + 加入家庭页，已连真实数据跑通；**未做视觉截图核对** |
+
+## 37.6.1 仓库与凭据的当前约定
+
+```text
+身份      git user.name=che / email=404909615@qq.com，只写在仓库 local config，
+          没有动全局配置
+密钥      全部集中在 supabase/.env.local（已被 .gitignore 的 *.local 规则排除）。
+          提交前用 git diff --cached --name-only 复核过，暂存区里唯一的 .env* 是
+          .env.example，内容全是占位符
+一次性    建仓用的 GitHub PAT 用完即从 .env.local 清空，CI 不依赖它
+          （workflow 用的是 runner 自带的 GITHUB_TOKEN）。
+          ⚠ 该 PAT 曾在对话里出现过，建议直接去 GitHub 吊销重建
+网络      这台机器上 api.github.com 直连通，github.com 直连超时，
+          所以 tools/github-setup.mjs 里是「API 直连 + git 走 127.0.0.1:7897 代理」。
+          凭据只通过临时 askpass 注入，跑完即删，不写进 .git/config
+```
+
+**GitHub Secrets 加密的两个坑**，改脚本时别踩回去：
+
+1. `tweetnacl` **没有实现 sealed box**（只有 SHA-512，而 GitHub 用 libsodium 的 blake2b 派生 nonce），必须用 `libsodium-wrappers`。
+2. `libsodium.to_base64()` **默认是 URLSAFE 变体**（含 `_` `-`），GitHub 要标准 base64。用错会得到"API 返回成功、workflow 里解不开"的 Secret。脚本里统一走 `Buffer.from(x).toString('base64')` 规避。
+
 
 ## 37.7 前端实现要点
 
