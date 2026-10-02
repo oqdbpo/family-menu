@@ -45,10 +45,17 @@ export async function memberOverview() {
   return data || [];
 }
 
-// 守卫全在数据库里（0004）：不能删自己、只能删本家庭的人。
+// 守卫全在数据库里（0004/0005）：不能删自己、不能删现任管理员、只能删本家庭的人。
 // 这里不预判，否则离线/缓存不一致时前端会给出假的安全感
 export async function removeMember(id) {
   const { data, error } = await sb.rpc('remove_member', { p_member: id });
+  if (error) throw error;
+  return data;
+}
+
+// 只有现任管理员能交，且只能交给绑了设备的成员（0005）
+export async function transferOwner(id) {
+  const { data, error } = await sb.rpc('transfer_owner', { p_member: id });
   if (error) throw error;
   return data;
 }

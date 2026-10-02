@@ -1203,11 +1203,13 @@ PWA 手机体验优化
 ④ node supabase/run-sql.mjs supabase/migrations/0002_family_id_default.sql
    node supabase/run-sql.mjs supabase/migrations/0003_table_plan_unique.sql
    node supabase/run-sql.mjs supabase/migrations/0004_member_management.sql
+   node supabase/run-sql.mjs supabase/migrations/0005_owner_transfer.sql
+   node supabase/run-sql.mjs supabase/migrations/0006_seafood_subcategory.sql
 ⑤ node supabase/run-sql.mjs supabase/seed.sql
 ⑥ 通知 PostgREST 重载 schema 缓存：
      notify pgrst, 'reload schema';
      ↑ 不做这步，/rest/v1/rpc/* 会返回 404 "requested path is invalid"
-⑦ node supabase/verify.mjs --write     只读 11 项，加 --write 走写链路共 12 项，全绿才算通
+⑦ node supabase/verify.mjs --write     只读 17 项，加 --write 走写链路共 18 项，全绿才算通
 ⑧ 建 GitHub 仓库并推送，配 4 项 Actions Secrets/Variables，手动 Run 一次 workflow
 ```
 
@@ -1340,7 +1342,7 @@ supabase rpc random_table(people, meal_type)
 | `supabase/migrations/0002_family_id_default.sql` | 已执行 |
 | `supabase/seed.sql` | 已执行，30 道菜 + 11 条历史订单 |
 | Storage `dish-images` | 11 张菜品插画已上传并回填 `image_path`，剩 19 道待家人实拍 |
-| `supabase/verify.mjs` | 只读 11 项全绿；加 `--write` 走 confirm 链路共 12 项（含 RLS 隔离、随机权重、成员守卫、confirm 幂等）。**跑完自动删掉本次的匿名身份**，不再往示范家庭堆陌生成员；要看现场加 `--keep-session` |
+| `supabase/verify.mjs` | 只读 17 项全绿；加 `--write` 走 confirm 链路共 18 项（含 RLS 隔离、随机权重、成员守卫、管理员移交、confirm 幂等）。**跑完自动删掉本次的匿名身份**，不再往示范家庭堆陌生成员；要看现场加 `--keep-session` |
 | `.github/workflows/keepalive.yml` | **已上线并跑通**：首次手动运行 `conclusion=success`，PostgREST 返回 200，心跳提交已由 `keepalive-bot` 推回仓库 |
 | GitHub 仓库 | `oqdbpo/family-menu`，**public**（Pages 免费档不支持私有库），main 分支 |
 | GitHub Pages | **已上线** `https://oqdbpo.github.io/family-menu/`；`deploy-web` run #1 success；强制直连实测首页 / manifest / sw.js / 图标 / JS 主包全部 200 |
@@ -1349,7 +1351,9 @@ supabase rpc random_table(people, meal_type)
 | Actions Secrets & Variables | `SB_ANON_KEY` `SB_MGMT_TOKEN`（Secrets）+ `SB_URL` `SB_PROJECT_REF`（Variables）全部写入 |
 | `design/_raw/` | **不进仓库**（17 MB 未处理原件，本地保留；`design/assets/` 才是产物） |
 | `src/` Vue 3 前端 | 7 个页面（含新增的家庭成员页）+ 加入家庭页，已连真实数据跑通 |
-| `migrations/0004` + 成员管理页 | **已在真机点过一遍**：浏览器里移除示范成员 → 回读数据库确认真删了、偏好级联没了 → 重跑 seed 复位。见 37.10 |
+| `migrations/0004`～`0006` + 成员管理页 | **已在真机点过一遍**：浏览器里移除示范成员、交出管理员、试图移除现任管理员被数据库拒绝 → 每步都回读数据库核对 → 恢复到 seed 状态。见 37.10 |
+| 「我的」点不进去 | **已修**：部署后旧 chunk 文件名 404，部署前打开的标签页点懒加载路由就没反应。`src/main.js` 接 `vite:preloadError` 重载一次。见 37.11 |
+| 清理脚本 | `cleanup-test-members.sql`（自检遗留成员）、`cleanup-orphan-identities.sql`（无主匿名身份，实测清掉 9 个） |
 | `tools/dev-tunnel.mjs` | 本地隧道。给不吃系统代理的浏览器（内置预览面板）开一条到 Supabase 的真数据通路，见 37.10.1 |
 | `worker/` Supabase 反代 | **代码就绪、联调通过，等一个域名**。23 项逻辑自测全绿；真打上游验证过 5 条路径（见 37.9） |
 
@@ -1523,6 +1527,63 @@ npx vite                      # 终端 2
 界面照样打真域名、照样卡在「正在叫醒厨房」，看着像前端的 bug。
 必须走 `gen-env.mjs` 改 `.env`（实测踩出来的）。
 隧道只给本地验收用，**别指向真家庭**，它产生的是真实写入。
+
+### 37.10.2 管理员只有一个来源（0005）
+
+`families.owner_uid`（权威，`fam_write` 策略真正读它）和 `family_members.role='owner'`
+（`create_family` 顺手写的标签）是**两个地方**，而示范家庭里这俩是矛盾的：
+`owner_uid` 是种子占位 `0000…`（对不上任何成员），那个假的「爸爸」成员行却 `role='owner'`。
+0004 之前 UI 画的是 role，于是徽章说"管理员"、规则却不管——两处不一致迟早让人误判。
+
+现在**徽章和守卫都只看 `owner_uid`**：`member_overview()` 多出 `is_owner` 列，
+`transfer_owner()` 一次把 `owner_uid` 和 `role` 写齐，不留中间态。
+
+守卫链（全部在数据库里，17 项自检逐条点过）：
+
+```text
+普通成员想移除现任管理员  → 400 TA 是这个家的管理员。先把管理员交给别人，再来移除
+普通成员想给自己升管理员  → 403 只有现任管理员能把管理员交给别人
+未绑定设备的成员          → 当不了管理员（owner_uid 要能对上一个真实登录）
+退位的前管理员想移走现任  → 照样 400（证明移交是真的，不是只改了标签）
+```
+
+用临时家庭跑这些断言，绝不在 DEMO01 或真家庭上试管理员。
+
+## 37.11 「我的」点不进去：PWA 陈旧分包
+
+症状是"点了没反应"，界面上没有任何提示，控制台只有一条 404。根因：
+
+1. 每次部署所有 chunk 文件名（hash）都变；
+2. GitHub Pages 的部署是整体替换，**旧文件直接 404**（实测
+   `DishManage-7L0LnLuJ.js` 和 `index-DgKIwyRa.js` 都返回 404，新名字 200）；
+3. 部署前就打开着的标签页，内存里还是旧的主包，它引用的懒加载路由文件名已经不存在；
+4. `registerType:'autoUpdate'` + `cleanupOutdatedCaches:true` 让新 SW 接管并清掉旧 precache，
+   所以缓存也救不了。
+
+于是家人手机上"上一次打开过 → 我部署了 → 再点「我的」"必然复现。
+`src/main.js` 接住 Vite 抛在 window 上的 `vite:preloadError`，重载一次拿新包，
+并用 sessionStorage 记时间戳做 15 秒护栏，防止"真是断网"时变成无限刷新。
+
+验证方式：在构建产物里确认 Vite 8 真的会派发这个事件——
+`dist/assets/index-*.js` 中 `__vitePreload` 的实现带着
+``dispatchEvent(new CustomEvent(`vite:preloadError`,{cancelable:!0}))``，
+且路由的每个 `import('./Xxx.js')` 都过这个包装器。不是照着记忆写的 API。
+
+## 37.12 加一个分类 = 插一行（0006 的其他海鲜）
+
+「荤菜下加其他海鲜，录入时可选、点菜时可筛」——**零代码改动**，只插了一行
+`category_dict`。因为两端都是现读字典表：`DishForm.vue` 的细分胶囊按
+`meal_type + category` 过滤出非空 `subcategory`，`Order.vue` 同理，
+`stores/dishes.js` 按 `d.subcategory` 筛。这正是第 33.2 节
+「数据驱动 UI，不写死在前端」要的样子。
+
+实测：点菜页荤菜 11 道 → 点「其他海鲜」→ 2 道（清蒸鲈鱼、白灼虾），
+下面的做法条也自动只剩这 2 道用得到的（蒸、煮）；录入页细分胶囊变成
+`不限 / 其他海鲜`。
+
+`sort` 各占一段号，别乱塞：一级分类 1~6，火锅细分 301~，荤菜细分从 101 起。
+第一次写的时候把「其他海鲜」放成 sort=2 并顺手顺延了素菜/火锅，
+结果 火锅 和 汤 挤成同一个 sort=4，把分类胶囊的顺序打乱了——已回退。
 
 
 ---

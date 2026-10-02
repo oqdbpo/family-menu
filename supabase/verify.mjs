@@ -84,6 +84,21 @@ async function call(p, { method = 'GET', body, auth = false, prefer, tok } = {})
   return json ?? text;
 }
 
+// 少数收尾动作（删掉本次创建的整站临时数据）REST 做不到，走 Management API。
+// 缺令牌时返回 null 而不是抛错——自检结论不该被清理步骤绑架
+async function mgmt(sql) {
+  const REF = env.SB_PROJECT_REF, TOK = env.SB_MGMT_TOKEN;
+  if (!REF || !TOK) return null;
+  const r = await fetch(`https://api.supabase.com/v1/projects/${REF}/database/query`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${TOK}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: sql }),
+  });
+  const t = await r.text();
+  if (!r.ok) throw new Error(`HTTP ${r.status} ${t.slice(0, 120)}`);
+  return t;
+}
+
 console.log(`\n目标 ${URL}\n${'─'.repeat(64)}`);
 
 // ---------- 1. 匿名登录 ----------
@@ -209,7 +224,71 @@ try {
   }
 }
 
-// ---------- 8. 可选：确认点餐全链路 ----------
+// ---------- 8. 管理员：只有现任能移交，没交出去就移不掉 ----------
+// 用一个临时家庭跑，绝不碰 DEMO01 的演示数据，更不碰真家庭
+{
+  let scratch = null;
+  try {
+    const c = await call('/auth/v1/signup', { method: 'POST', body: { anonymous: true } });
+    if (c.user?.id) identities.push(c.user.id);
+    const f = await call('/rest/v1/rpc/create_family',
+      { method: 'POST', body: { p_name: '验收临时家', p_owner_name: '甲' }, auth: true, tok: c.access_token });
+    scratch = Array.isArray(f) ? f[0] : f;
+
+    const d = await call('/auth/v1/signup', { method: 'POST', body: { anonymous: true } });
+    if (d.user?.id) identities.push(d.user.id);
+    await call('/rest/v1/rpc/join_family',
+      { method: 'POST', body: { p_code: scratch.invite_code, p_name: '乙' }, auth: true, tok: d.access_token });
+
+    const tc = c.access_token, td = d.access_token;
+    const list1 = await call('/rest/v1/rpc/member_overview', { method: 'POST', body: {}, auth: true, tok: tc });
+    const boss = list1.find(m => m.name === '甲'), deputy = list1.find(m => m.name === '乙');
+
+    say('is_owner 只认 owner_uid，且全户只有一个',
+        list1.length === 2 && boss?.is_owner === true && deputy?.is_owner === false,
+        `甲 ${boss?.is_owner} / 乙 ${deputy?.is_owner}`);
+
+    // 成功时把 remove_member 返回的人名存进 removed，失败时把拒绝理由当返回值传出去
+    let removed = null;
+    const grab = async (tok, who) => {
+      try { removed = await call('/rest/v1/rpc/remove_member', { method: 'POST', body: { p_member: who }, auth: true, tok }); return ''; }
+      catch (e) { return e.message; }
+    };
+    const tussle = async (tok, who) => {
+      try { await call('/rest/v1/rpc/transfer_owner', { method: 'POST', body: { p_member: who }, auth: true, tok }); return ''; }
+      catch (e) { return e.message; }
+    };
+
+    const m1 = await grab(td, boss.id);
+    say('普通成员想移除现任管理员 → 被拒', /管理员/.test(m1) && /交给/.test(m1), m1 || '没报错，管理员被删了！');
+
+    const m2 = await tussle(td, deputy.id);
+    say('普通成员想给自己升管理员 → 被拒', /只有现任管理员/.test(m2), m2 || '没报错，自己封自己了');
+
+    const gave = await call('/rest/v1/rpc/transfer_owner',
+      { method: 'POST', body: { p_member: deputy.id }, auth: true, tok: tc });
+    const list2 = await call('/rest/v1/rpc/member_overview', { method: 'POST', body: {}, auth: true, tok: tc });
+    say('现任管理员移交后 is_owner 立刻换位',
+        gave === '乙' && list2.find(x => x.name === '乙')?.is_owner === true
+                  && list2.find(x => x.name === '甲')?.is_owner === false,
+        `交给「${gave}」`);
+
+    const m3 = await grab(tc, deputy.id);
+    say('退位的前管理员想移走现任 → 照样被拒', /管理员/.test(m3), m3 || '没报错');
+
+    const took = await grab(td, boss.id);
+    const list3 = await call('/rest/v1/rpc/member_overview', { method: 'POST', body: {}, auth: true, tok: td });
+    say('现任管理员能移除刚退位的那位', took === '' && removed === '甲' && list3.length === 1,
+        took || `${removed} 已被移除，剩下 ${list3.map(x => x.name).join('、')}`);
+  } catch (e) {
+    say('管理员移交链路', false, e.message);
+  } finally {
+    // 临时家庭连成员一起拆掉，不给示范库留垃圾
+    if (scratch?.family_id) await mgmt(`delete from families where id = '${scratch.family_id}'::uuid;`).catch(() => {});
+  }
+}
+
+// ---------- 9. 可选：确认点餐全链路 ----------
 if (WRITE_TEST) {
   const DEMO_FAMILY = '11111111-1111-1111-1111-111111111111';
   const today = new Date().toISOString().slice(0, 10);
@@ -253,7 +332,7 @@ if (WRITE_TEST) {
   console.log('  SKIP  确认点餐全链路（加 --write 开启，会往示范家庭写一条记录）');
 }
 
-// ---------- 9. 自清理：删掉本次创建的所有匿名身份 ----------
+// ---------- 10. 自清理：删掉本次创建的所有匿名身份 ----------
 // 第 2 项检查的前提是"这个会话还没加入任何家庭"，所以每轮都必须新签一个身份，
 // 不能复用缓存 token。代价是不管的话，示范家庭里会一路堆陌生成员
 // （实测几轮下来攒了 4 个"新成员/自检设备"）。默认自己擦干净；
