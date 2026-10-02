@@ -1,0 +1,115 @@
+# =============================================================================
+# 防止 Supabase 免费项目被暂停
+#
+# 背景：Supabase 免费层「连续 1 周无活动」会暂停项目，且暂停后不会自动恢复，
+#      必须在 Dashboard 点 restore 或调 Management API；暂停超过 90 天数据被清除。
+#
+# 两道保险：
+#   1) 每 6 小时用 anon key 打一次真实 PostgREST 查询 —— 产生真实数据库连接
+#   2) 万一还是被暂停了，自动调 Management API restore，不用人盯着
+#
+# 还有一个容易忽略的坑：GitHub 对「连续 60 天无提交」的私有仓库会静默停用
+# scheduled workflow，而定时任务自己的运行不算仓库活动。所以下面第 3 步
+# 每 20 天做一次心跳提交，让仓库保持"活跃"。
+#
+# 需要在仓库 Settings → Secrets and variables → Actions 里配置：
+#   Secret   SB_ANON_KEY      Supabase 项目的 anon public key（sb_publishable_... / JWT）
+#   Secret   SB_MGMT_TOKEN    Supabase 个人访问令牌 https://supabase.com/dashboard/account/tokens
+#   Variable SB_URL           https://<ref>.supabase.co
+#   Variable SB_PROJECT_REF   项目 ref，就是 SB_URL 中间那段
+#
+# 首次推送后要手动 Run workflow 一次，否则 GitHub 不会激活 schedule。
+# 记得在个人设置里打开 workflow failure 邮件通知 —— 这是你唯一的告警渠道。
+# =============================================================================
+name: keep-supabase-awake
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: keepalive
+  cancel-in-progress: true
+
+jobs:
+  wake:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 查一次数据库（只有真正建连才算活动）
+        id: ping
+        continue-on-error: true
+        run: |
+          code=$(curl -sS --max-time 30 \
+            -o /tmp/resp.json -w '%{http_code}' \
+            -H "apikey: ${SB_ANON_KEY}" \
+            -H "Authorization: Bearer ${SB_ANON_KEY}" \
+            "${SB_URL}/rest/v1/dishes?select=id&limit=1") || code="000"
+          echo "http=$code" >> "$GITHUB_OUTPUT"
+          echo "PostgREST -> HTTP $code"
+          cat /tmp/resp.json 2>/dev/null | head -c 200
+          case "$code" in
+            2*) echo "ok=1" >> "$GITHUB_OUTPUT" ;;
+            *)  echo "ok=0" >> "$GITHUB_OUTPUT" ;;
+          esac
+        env:
+          SB_URL: ${{ vars.SB_URL }}
+          SB_ANON_KEY: ${{ secrets.SB_ANON_KEY }}
+
+      - name: 被暂停了就自动恢复
+        if: steps.ping.outputs.ok == '0'
+        run: |
+          if [ -z "${SB_MGMT_TOKEN:-}" ] || [ -z "${SB_PROJECT_REF:-}" ]; then
+            echo "::error::没配 SB_MGMT_TOKEN / SB_PROJECT_REF，无法自动恢复，请去 Dashboard 手动 restore"
+            exit 1
+          fi
+          st=$(curl -sS -H "Authorization: Bearer $SB_MGMT_TOKEN" \
+                 "https://api.supabase.com/v1/projects/$SB_PROJECT_REF" \
+               | sed -n 's/.*"status":"\([^"]*\)".*/\1/p')
+          echo "当前项目状态：$st"
+          if [ "$st" = "PAUSED" ]; then
+            curl -sS -X POST -H "Authorization: Bearer $SB_MGMT_TOKEN" \
+              "https://api.supabase.com/v1/projects/$SB_PROJECT_REF/restore"
+            echo "已触发 restore，通常需要 1-2 分钟"
+          elif [ "$st" != "RESTORING" ]; then
+            echo "::error::数据库连不上但项目状态是 '$st'，不是暂停问题，需要人工排查"
+            exit 1
+          fi
+        env:
+          SB_MGMT_TOKEN: ${{ secrets.SB_MGMT_TOKEN }}
+          SB_PROJECT_REF: ${{ vars.SB_PROJECT_REF }}
+
+      - name: 心跳提交（防 schedule 被 GitHub 静默停用）
+        if: always()
+        run: |
+          set -e
+          printf '{"last_ping":"%s","http":"%s","run":"%s"}\n' \
+            "$(date -u +%FT%TZ)" "${{ steps.ping.outputs.http }}" "$GITHUB_RUN_ID" \
+            > .keepalive.json
+          last=$(git log -n 1 --format=%ct -- .keepalive.json 2>/dev/null || echo 0)
+          [ -z "$last" ] && last=0
+          age=$(( $(date +%s) - last ))
+          if [ "$age" -gt $((20 * 86400)) ]; then
+            git config user.name  "keepalive-bot"
+            git config user.email "keepalive-bot@users.noreply.github.com"
+            git add .keepalive.json
+            git commit -m "chore(keepalive): heartbeat $(date -u +%F)"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+            echo "已提交心跳（距上次 $((age/86400)) 天）"
+          else
+            echo "距上次心跳 $((age/86400)) 天，无需提交"
+          fi
+
+      - name: 失败就大声报错，别让它静默挂掉
+        if: steps.ping.outputs.ok != '1'
+        run: |
+          echo "::error::Supabase keep-alive 失败（HTTP ${{ steps.ping.outputs.http }}）。"
+          echo "::error::请立刻去 Dashboard 检查项目状态 —— 超过 90 天未恢复数据会被清除。"
+          exit 1

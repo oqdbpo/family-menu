@@ -1,0 +1,1876 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>家庭点餐系统 · 植物手账风 UI 设计稿</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   DESIGN TOKENS — 植物手账 / Botanical Journal
+   取色自参考图，已按面积聚类校准；同时是 Vue 落地时的唯一来源
+   ============================================================ */
+:root{
+  /* 纸与墨 */
+  --canvas:#F4F1E9;        /* 亚麻米白，全站唯一底色，禁止纯白/纯灰 */
+  --surface:#FFFFFF;       /* 卡片 */
+  --surface-2:#FBF9F3;     /* 卡片内的次级分区 */
+  --ink:#2A2A24;           /* 暖炭黑正文，禁止 #000 */
+  --ink-2:#6E6E63;         /* 次要文字 */
+  --ink-3:#A6A598;         /* 占位/禁用 */
+  --line:#E7E2D2;          /* 发丝线，能用留白就不用它 */
+
+  /* 主色系（取自插画植物） */
+  --olive:#8E9348;         /* 橄榄苔绿 · 品牌主色 · 图标线描 */
+  --olive-deep:#6E7334;    /* 小字号文本必须用它（AA 5:1） */
+  --olive-mid:#C6C57E;     /* 浅苔绿 · 描边/次级强调 */
+  --olive-wash:#EDF0DA;    /* 极浅绿底 · 选中态 */
+
+  /* 点缀（取自插画蔬果），只用于「有意义」的状态 */
+  --terracotta:#DE8942;    /* 陶土橙 · 主行动/随机 */
+  --terracotta-wash:#FAE9D8;
+  --mustard:#D8A730;       /* 芥末黄 · 常吃/高频 */
+  --mustard-wash:#F9F0D6;
+  --mauve:#9C7A96;         /* 灰紫 · 收藏/家庭 */
+  --mauve-wash:#F0E7EF;
+  --danger:#C0603F;        /* 删除/停用，是陶土的暗化版，不引入新色相 */
+
+  /* 圆角 */
+  --r-xl:28px; --r-lg:22px; --r-md:16px; --r-sm:11px; --r-pill:999px;
+
+  /* 阴影：只有一档常规 + 一档浮层，都很轻 */
+  --sh-card:0 1px 2px rgba(94,86,60,.05), 0 6px 18px rgba(94,86,60,.06);
+  --sh-float:0 10px 34px rgba(94,86,60,.16);
+
+  /* 字体 */
+  --f-hand:'Caveat','Segoe Script','Comic Sans MS',cursive;
+  --f-sans:-apple-system,'PingFang SC','HarmonyOS Sans SC','Microsoft YaHei','Noto Sans SC',sans-serif;
+
+  /* 动效 */
+  --t-fast:150ms; --t:240ms; --t-slow:420ms;
+  --ease:cubic-bezier(.22,.8,.28,1);
+  --ease-back:cubic-bezier(.34,1.4,.64,1);
+
+  /* 间距：4 的倍数，卡片内边距固定 16/20 */
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:20px; --s6:28px; --s7:40px;
+
+  /* 设备安全区与内容宽度（真机才有值，桌面回落 0） */
+  --sab:env(safe-area-inset-bottom,0px);
+  --sat:env(safe-area-inset-top,0px);
+  --app-max:560px;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  background:var(--canvas);color:var(--ink);font-family:var(--f-sans);
+  font-size:15px;line-height:1.7;
+  background-image:
+    radial-gradient(circle at 12% 8%, rgba(198,197,126,.16), transparent 42%),
+    radial-gradient(circle at 88% 4%, rgba(222,137,66,.09), transparent 38%);
+  background-attachment:fixed;
+}
+img{display:block;max-width:100%}
+code,kbd{font-family:'Cascadia Code',Consolas,'JetBrains Mono',monospace}
+
+/* ============================================================
+   文档外壳（设计稿本身也使用同一套设计语言）
+   ============================================================ */
+.wrap{max-width:1320px;margin:0 auto;padding:0 var(--s6) 96px}
+.doc-head{padding:72px 0 32px;position:relative}
+.doc-head .kicker{font-family:var(--f-hand);font-size:26px;color:var(--olive);line-height:1}
+.doc-head h1{font-size:40px;font-weight:800;letter-spacing:-.5px;line-height:1.25;margin-top:6px}
+.doc-head h1 em{font-style:normal;color:var(--olive-deep)}
+.doc-head p.lede{color:var(--ink-2);max-width:62ch;margin-top:14px}
+.doc-meta{display:flex;flex-wrap:wrap;gap:var(--s2);margin-top:22px}
+.doc-meta span{font-size:12px;color:var(--olive-deep);background:var(--surface);
+  border:1px solid var(--line);border-radius:var(--r-pill);padding:5px 13px}
+
+.nav{position:sticky;top:0;z-index:60;display:flex;gap:6px;flex-wrap:wrap;
+  padding:10px 0;margin-bottom:8px;background:rgba(244,241,233,.92);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.nav a{font-size:13px;color:var(--ink-2);text-decoration:none;padding:6px 13px;
+  border-radius:var(--r-pill);transition:all var(--t-fast) var(--ease)}
+.nav a:hover{background:var(--olive-wash);color:var(--olive-deep)}
+
+section{padding:52px 0 8px;scroll-margin-top:64px}
+.sec-head{display:flex;align-items:flex-end;gap:var(--s4);margin-bottom:var(--s6);flex-wrap:wrap}
+.sec-head .n{font-family:var(--f-hand);font-size:34px;color:var(--olive-mid);line-height:1}
+.sec-head h2{font-size:24px;font-weight:800;letter-spacing:-.3px}
+.sec-head .en{font-family:var(--f-hand);font-size:17px;color:var(--olive);line-height:1}
+.sec-head p{color:var(--ink-2);font-size:13.5px;flex-basis:100%;max-width:78ch;margin-top:-2px}
+
+.panel{background:var(--surface);border-radius:var(--r-xl);padding:var(--s6);box-shadow:var(--sh-card)}
+.grid{display:grid;gap:var(--s4)}
+.g2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.g4{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.hint{font-size:12.5px;color:var(--ink-3)}
+.hint b{color:var(--olive-deep);font-weight:700}
+ul.ticks{list-style:none;display:grid;gap:9px;margin-top:14px}
+ul.ticks li{position:relative;padding-left:26px;font-size:13.5px;color:var(--ink-2)}
+ul.ticks li:before{content:'';position:absolute;left:2px;top:9px;width:13px;height:7px;
+  border-left:2px solid var(--olive);border-bottom:2px solid var(--olive);transform:rotate(-45deg)}
+ul.cross li:before{content:'';width:12px;height:2px;border:0;background:var(--danger);transform:rotate(-45deg);top:12px;left:3px}
+ul.cross li:after{content:'';position:absolute;width:12px;height:2px;background:var(--danger);
+  top:12px;left:3px;transform:rotate(45deg)}
+.h3{font-size:15px;font-weight:700;margin-bottom:4px}
+.h3 .en{font-family:var(--f-hand);font-size:14px;color:var(--olive);margin-left:6px;font-weight:400}
+
+/* 色卡 */
+.sw{border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--line);background:var(--surface)}
+.sw .chipcolor{height:88px;position:relative}
+.sw .chipcolor i{position:absolute;left:10px;bottom:8px;font-style:normal;font-size:10px;
+  letter-spacing:.1em;color:rgba(255,255,255,.85);text-shadow:0 1px 3px rgba(0,0,0,.25)}
+.sw .chipcolor.dark i{color:rgba(42,42,36,.55);text-shadow:none}
+.sw .body{padding:11px 13px 13px}
+.sw .role{font-size:13.5px;font-weight:700}
+.sw .tok{font-family:'Cascadia Code',Consolas,monospace;font-size:11.5px;color:var(--olive-deep)}
+.sw .hex{font-family:'Cascadia Code',Consolas,monospace;font-size:11.5px;color:var(--ink-3)}
+.sw .use{font-size:12px;color:var(--ink-2);margin-top:5px;line-height:1.55}
+
+/* 表格 */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-weight:700;color:var(--olive-deep);font-size:11px;
+  letter-spacing:.1em;text-transform:uppercase;padding:0 12px 10px}
+td{padding:11px 12px;border-top:1px solid var(--line);vertical-align:top;color:var(--ink-2)}
+td:first-child{color:var(--ink);font-weight:600}
+td code{font-size:12px;color:var(--olive-deep);background:var(--surface-2);padding:2px 6px;border-radius:5px}
+
+/* 排版层级预览 */
+.type-row{display:flex;align-items:baseline;gap:var(--s4);padding:14px 0;border-top:1px dashed var(--line)}
+.type-row:first-child{border-top:0}
+.type-row .spec{margin-left:auto;font-family:'Cascadia Code',Consolas,monospace;
+  font-size:11px;color:var(--ink-3);text-align:right;white-space:nowrap;line-height:1.6}
+
+/* 组件样例容器 */
+.spec-row{display:flex;flex-wrap:wrap;gap:var(--s3);align-items:center}
+.spec-box{border:1px dashed var(--line);border-radius:var(--r-lg);padding:var(--s4);
+  flex:1 1 240px;min-width:240px}
+.spec-box>.lbl{font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink-3);margin-bottom:12px;font-family:'Cascadia Code',Consolas,monospace}
+
+/* 图标网格 */
+.ico-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:var(--s2)}
+.ico-cell{display:grid;place-items:center;gap:7px;padding:14px 6px;border-radius:var(--r-md);
+  background:var(--surface-2);transition:background var(--t-fast) var(--ease)}
+.ico-cell:hover{background:var(--olive-wash)}
+.ico-cell svg{width:24px;height:24px;stroke:var(--olive-deep)}
+.ico-cell span{font-size:10.5px;color:var(--ink-3);font-family:'Cascadia Code',Consolas,monospace}
+
+/* ============================================================
+   手机框
+   ============================================================ */
+.stage{display:flex;flex-wrap:wrap;gap:var(--s6);align-items:flex-start}
+.unit{flex:0 0 auto}
+.unit>.cap{display:flex;align-items:baseline;gap:9px;margin:0 0 12px 6px}
+.unit>.cap b{font-size:14.5px}
+.unit>.cap code{font-size:11.5px;color:var(--olive-deep);background:var(--surface);
+  border:1px solid var(--line);padding:2px 8px;border-radius:var(--r-pill)}
+.unit>.cap i{font-style:normal;font-size:12px;color:var(--ink-3)}
+.phone{width:414px;padding:12px 12px 14px;border-radius:54px;position:relative;
+  background:linear-gradient(160deg,#3a3a34,#1c1c19 60%,#2e2e29);
+  box-shadow:var(--sh-float), inset 0 0 0 1px rgba(255,255,255,.09)}
+.screen{width:390px;height:844px;border-radius:44px;overflow:hidden;position:relative;
+  background:var(--canvas);isolation:isolate}
+.notch{position:absolute;top:11px;left:50%;transform:translateX(-50%);
+  width:118px;height:30px;border-radius:var(--r-pill);background:#141412;z-index:40}
+.scroll{position:absolute;inset:0;overflow-y:auto;overscroll-behavior:contain;
+  scrollbar-width:none;-ms-overflow-style:none;padding-bottom:96px}
+.scroll::-webkit-scrollbar{width:0;height:0}
+
+/* ============================================================
+   APP UI 组件（.ui-*）—— 这层就是 Vue 组件的样式蓝本
+   ============================================================ */
+.ic{fill:none;stroke:var(--olive-deep);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;display:block}
+/* 图标是 24 单位矢量，缩到小尺寸时描边会变细 —— 按显示尺寸反向补偿 */
+.iconbtn svg,.navbar .back svg,.stepper button svg,.chip svg,.row .ops svg,
+.search svg,.datebar .nav2 svg,.fambadge svg,.result .why svg,.wide .l+p svg,
+.upl .box svg,.empty svg,.off-line svg,.banner svg{stroke-width:2.1}
+.tabbar a svg{stroke-width:1.9}
+.dice-btn svg{stroke-width:1.1}
+.mosaic .mrow svg{stroke-width:1.6}
+.mosaic .big .illu svg{stroke-width:1.2}
+.app{font-family:var(--f-sans);color:var(--ink);font-size:15px;line-height:1.6}
+.statusbar{height:52px;display:flex;align-items:flex-end;justify-content:space-between;
+  padding:0 26px 6px;font-size:13px;font-weight:700;color:var(--ink);letter-spacing:.3px}
+.statusbar .r{display:flex;gap:5px;align-items:center}
+.statusbar .r i{display:block;background:var(--ink);border-radius:2px;font-style:normal}
+.statusbar .r i:nth-child(1){width:16px;height:10px}
+.statusbar .r i:nth-child(2){width:13px;height:10px;clip-path:polygon(0 100%,50% 0,100% 100%);border-radius:0}
+.statusbar .r i:nth-child(3){width:22px;height:10px;border-radius:3px;position:relative}
+.statusbar .r i:nth-child(3):after{content:'';position:absolute;inset:2px;width:66%;background:var(--canvas);border-radius:1px}
+
+.navbar{display:flex;align-items:center;gap:var(--s3);padding:6px 18px 12px}
+.navbar .back{width:34px;height:34px;border-radius:var(--r-pill);background:var(--surface);
+  display:grid;place-items:center;box-shadow:var(--sh-card);flex:0 0 auto}
+.navbar .back svg{width:18px;height:18px;stroke:var(--olive-deep)}
+.navbar .t{line-height:1.15}
+.navbar .t b{font-size:17px;font-weight:800;letter-spacing:-.2px;display:block}
+.navbar .t em{font-style:normal;display:block;font-family:var(--f-hand);
+  font-size:13px;color:var(--olive);line-height:1}
+.navbar .act{margin-left:auto;display:flex;gap:8px}
+.iconbtn{width:34px;height:34px;border-radius:var(--r-pill);background:var(--surface);
+  display:grid;place-items:center;box-shadow:var(--sh-card);flex:0 0 auto}
+.iconbtn svg{width:17px;height:17px;stroke:var(--olive-deep)}
+.iconbtn.on svg{stroke:var(--terracotta)}
+
+.pad{padding:0 18px}
+.sec-t{display:flex;align-items:baseline;gap:8px;margin:22px 18px 11px}
+.sec-t b{font-size:15.5px;font-weight:800}
+.sec-t em{font-style:normal;font-family:var(--f-hand);font-size:13px;color:var(--olive);line-height:1}
+.sec-t .more{margin-left:auto;font-size:12px;color:var(--ink-3)}
+
+/* 品牌 wordmark */
+.wordmark{text-align:center;padding:2px 18px 0}
+.wordmark .en{font-family:var(--f-hand);font-size:34px;color:var(--olive);line-height:1.05;letter-spacing:.5px}
+.wordmark .sub{font-family:var(--f-hand);font-size:14px;color:var(--olive-mid);line-height:1;margin-top:2px}
+
+/* 卡片 */
+.card{background:var(--surface);border-radius:var(--r-lg);padding:var(--s4);box-shadow:var(--sh-card)}
+.card.tap{transition:transform var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease)}
+.card.tap:active{transform:scale(.98)}
+
+/* 双语标签块（参考图的核心排版特征） */
+.bi{text-align:center;line-height:1.25}
+.bi em{display:block;font-style:normal;font-size:10px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--ink-3);font-weight:600}
+.bi b{display:block;font-size:17px;font-weight:800;letter-spacing:-.2px;margin-top:1px}
+
+/* 按钮 */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  height:46px;padding:0 22px;border-radius:var(--r-pill);font-size:15px;font-weight:700;
+  border:0;font-family:inherit;letter-spacing:-.2px;white-space:nowrap;flex:0 0 auto;
+  transition:all var(--t-fast) var(--ease)}
+.btn svg{width:18px;height:18px}
+.btn.p{background:var(--olive);color:#fff}
+.btn.p svg{stroke:#fff}
+.btn.w{background:var(--terracotta);color:#fff}
+.btn.w svg{stroke:#fff}
+.btn.o{background:var(--surface);color:var(--olive-deep);box-shadow:inset 0 0 0 1.5px var(--olive-mid)}
+.btn.o svg{stroke:var(--olive-deep)}
+.btn.g{background:var(--olive-wash);color:var(--olive-deep)}
+.btn.sm{height:34px;padding:0 14px;font-size:13px;border-radius:var(--r-pill)}
+.btn.xs{height:28px;padding:0 11px;font-size:12px}
+.btn.blk{width:100%}
+.btn:active{transform:scale(.97)}
+.btn[disabled]{opacity:.42}
+
+/* 筹码 / 筛选片 */
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chips.nowrap{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.chips.nowrap::-webkit-scrollbar{display:none}
+.chip{display:inline-flex;align-items:center;gap:5px;height:32px;padding:0 14px;flex:0 0 auto;
+  border-radius:var(--r-pill);background:var(--surface);color:var(--ink-2);font-size:13px;
+  font-weight:600;box-shadow:inset 0 0 0 1px var(--line);transition:all var(--t-fast) var(--ease)}
+.chip svg{width:14px;height:14px;stroke:currentColor}
+.chip.on{background:var(--olive);color:#fff;box-shadow:none}
+.chip.on svg{stroke:#fff}
+.chip.warm.on,.chip.warm{background:var(--terracotta-wash);color:#A85F26;box-shadow:none}
+.chip.warm.on{background:var(--terracotta);color:#fff}
+.chip.m.on{background:var(--mauve);color:#fff}
+.chip.y.on{background:var(--mustard);color:#fff}
+
+/* 分段控件 */
+.seg{display:flex;background:var(--surface);border-radius:var(--r-pill);padding:4px;box-shadow:var(--sh-card)}
+.seg i{flex:1;text-align:center;font-style:normal;font-size:14px;font-weight:700;color:var(--ink-2);
+  padding:8px 0;border-radius:var(--r-pill);transition:all var(--t) var(--ease);cursor:pointer}
+.seg i.on{background:var(--olive-wash);color:var(--olive-deep)}
+.seg.warm i.on{background:var(--terracotta);color:#fff}
+
+/* 菜品卡 */
+.dish{display:flex;gap:12px;background:var(--surface);border-radius:var(--r-lg);
+  padding:11px;box-shadow:var(--sh-card);align-items:center}
+.dish+.dish{margin-top:10px}
+.dish .th,.thw{width:66px;height:66px;border-radius:var(--r-md);flex:0 0 auto;
+  background:var(--canvas);overflow:hidden}
+.dish .th{object-fit:cover}
+.thw img{width:100%;height:100%;object-fit:cover;transform:scale(var(--z,1.26))}
+.thg{border-radius:var(--r-md);overflow:hidden;background:var(--canvas);aspect-ratio:1}
+.thg img{width:100%;height:100%;object-fit:cover;transform:scale(var(--z,1.26))}
+.dish .b{flex:1;min-width:0}
+.dish .nm{display:flex;align-items:center;gap:6px}
+.dish .nm b{font-size:15px;font-weight:800;letter-spacing:-.2px}
+.dish .nm .fav{width:15px;height:15px;stroke:var(--mauve);fill:var(--mauve);flex:0 0 auto}
+.dish .meta{font-size:11.5px;color:var(--ink-3);margin-top:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dish .tags{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap}
+.tag{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:var(--r-pill);
+  background:var(--olive-wash);color:var(--olive-deep);white-space:nowrap}
+.tag.hot{background:var(--terracotta-wash);color:#A85F26}
+.tag.freq{background:var(--mustard-wash);color:#8C6A12}
+.tag.fam{background:var(--mauve-wash);color:#6E4D69}
+.tag.off{background:#F1EFE7;color:var(--ink-3)}
+.dish .rt{display:flex;flex-direction:column;align-items:center;gap:7px;flex:0 0 auto}
+.add{width:32px;height:32px;border-radius:var(--r-pill);background:var(--olive);
+  display:grid;place-items:center;box-shadow:0 3px 9px rgba(142,147,72,.34)}
+.add svg{width:17px;height:17px;stroke:#fff}
+.add.mini{width:26px;height:26px}.add.mini svg{width:14px;height:14px}
+.add.warm{background:var(--terracotta);box-shadow:0 3px 9px rgba(222,137,66,.34)}
+
+/* 辣度 */
+.spicy{display:inline-flex;gap:2px;align-items:center}
+.spicy i{width:9px;height:11px;display:block;background:var(--mustard);opacity:.22;
+  clip-path:polygon(50% 0,78% 34%,100% 72%,74% 100%,26% 100%,0 72%,22% 34%)}
+.spicy i.on{opacity:1;background:var(--terracotta)}
+
+/* 步进器 */
+.stepper{display:inline-flex;align-items:center;gap:2px;background:var(--surface-2);
+  border-radius:var(--r-pill);padding:3px}
+.stepper button{width:26px;height:26px;border:0;border-radius:var(--r-pill);background:var(--surface);
+  display:grid;place-items:center;box-shadow:var(--sh-card);color:var(--olive-deep);font-weight:800}
+.stepper button svg{width:13px;height:13px;stroke:var(--olive-deep)}
+.stepper span{min-width:22px;text-align:center;font-size:13.5px;font-weight:800}
+
+/* 开关 */
+.sw2{width:44px;height:26px;border-radius:var(--r-pill);background:var(--olive);
+  position:relative;transition:background var(--t) var(--ease);flex:0 0 auto}
+.sw2:after{content:'';position:absolute;top:3px;left:21px;width:20px;height:20px;border-radius:50%;
+  background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.18);transition:left var(--t) var(--ease)}
+.sw2.off{background:#DDD8C8}.sw2.off:after{left:3px}
+
+/* 头像 */
+.av{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
+  font-size:12.5px;font-weight:800;color:#fff;background:var(--olive);
+  box-shadow:0 0 0 2.5px var(--surface)}
+.av.m{background:var(--mauve)}.av.t{background:var(--terracotta)}.av.y{background:var(--mustard)}
+.av.lv{background:var(--surface);color:var(--olive-deep);box-shadow:inset 0 0 0 1.5px var(--olive-mid),0 0 0 2.5px var(--surface)}
+.avstack{display:flex}.avstack .av+.av{margin-left:-9px}
+
+/* 底部标签栏 */
+.tabbar{position:absolute;left:12px;right:12px;bottom:12px;height:74px;
+  background:rgba(255,255,255,.94);backdrop-filter:blur(12px);border-radius:32px;
+  box-shadow:var(--sh-float);display:flex;align-items:flex-start;padding:11px 8px 0;z-index:30}
+.tabbar a{flex:1;display:grid;justify-items:center;gap:3px;text-decoration:none;
+  color:var(--ink-3);font-size:10.5px;font-weight:700;transition:color var(--t-fast) var(--ease)}
+.tabbar a svg{width:22px;height:22px;stroke:currentColor}
+.tabbar a.on{color:var(--olive-deep)}
+.tabbar a.dice{position:relative}
+.tabbar a.dice .d{width:44px;height:44px;margin-top:-24px;border-radius:50%;background:var(--terracotta);
+  display:grid;place-items:center;box-shadow:0 6px 16px rgba(222,137,66,.42)}
+.tabbar a.dice .d svg{width:23px;height:23px;stroke:#fff}
+.tabbar a.dice span{color:#A85F26}
+
+/* 悬浮按钮 */
+.fab{position:absolute;right:18px;bottom:100px;width:54px;height:54px;border-radius:var(--r-pill);
+  background:var(--olive);display:grid;place-items:center;z-index:31;
+  box-shadow:0 10px 22px rgba(110,115,52,.4)}
+.fab svg{width:24px;height:24px;stroke:#fff}
+
+/* 底部操作条 */
+.dock{position:absolute;left:0;right:0;bottom:0;padding:14px 18px 30px;z-index:32;
+  background:linear-gradient(to top,var(--canvas) 62%,rgba(244,241,233,0));display:flex;gap:12px;align-items:center}
+.dock .sum{line-height:1.2;flex:1 1 auto;min-width:0}
+.dock .sum b{font-size:15px;font-weight:800;display:block;white-space:nowrap}
+.dock .sum em{font-style:normal;font-size:11.5px;color:var(--ink-3);white-space:nowrap}
+
+/* 首页宫格（复刻参考图的非对称卡片布局） */
+.mosaic{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 18px}
+.mosaic .big{grid-row:span 2;display:flex;flex-direction:column;justify-content:center;
+  align-items:center;gap:12px;padding:22px 14px;text-align:center}
+.mosaic .big .illu{width:96px;height:96px;border-radius:50%;background:var(--olive-wash);
+  display:grid;place-items:center}
+.mosaic .big .illu svg{width:52px;height:52px;stroke:var(--olive-deep);stroke-width:1.4}
+.mosaic .bi b{color:var(--olive-deep)}   /* 入口主标用深橄榄，白底 5:1 过 AA；--olive 只 3.3:1 不能用于小字 */
+.mosaic .mrow{display:flex;align-items:center;gap:11px;padding:15px 16px}
+.mosaic .mrow svg{width:26px;height:26px;stroke:var(--olive-deep);flex:0 0 auto}
+.mosaic .mrow .bi{text-align:left}
+.mosaic .mrow .bi em{font-size:9px}
+.mosaic .mrow .bi b{font-size:15.5px}
+.mosaic .mrow .ar{margin-left:auto;width:16px;height:16px;stroke:var(--olive-mid)}
+.wide{margin:12px 18px 0;background:var(--surface);border-radius:var(--r-lg);
+  padding:17px 18px;box-shadow:var(--sh-card);display:flex;align-items:center;gap:14px}
+.wide .l{flex:1;line-height:1.35}
+.wide .l b{font-size:16px;font-weight:800;display:block}
+.wide .l em{font-style:normal;font-size:11.5px;color:var(--ink-3);
+  font-family:'Cascadia Code',Consolas,monospace;letter-spacing:.06em;text-transform:uppercase}
+.wide .l p{font-size:11.5px;color:var(--ink-3);margin-top:3px}
+.wide svg.art{width:56px;height:44px;stroke:var(--olive);fill:none;stroke-width:1.5;flex:0 0 auto}
+
+/* 二维筛选：左食材 + 右内容 */
+.twocol{display:flex;gap:0;align-items:flex-start}
+.side{width:78px;flex:0 0 auto;display:flex;flex-direction:column;gap:2px;padding:0 0 0 12px}
+.twocol .thw{width:58px;height:58px}
+.twocol .dish{padding:9px}
+.side button{display:block;width:100%;text-align:center;border:0;background:transparent;
+  font-family:inherit;font-size:13px;font-weight:700;color:var(--ink-2);
+  padding:11px 4px;border-radius:14px 0 0 14px;position:relative;transition:all var(--t-fast) var(--ease)}
+.side button.on{background:var(--surface);color:var(--olive-deep);box-shadow:var(--sh-card)}
+.side button.on:before{content:'';position:absolute;left:-6px;top:50%;transform:translateY(-50%);
+  width:4px;height:19px;border-radius:var(--r-pill);background:var(--olive)}
+.side button .c{display:block;font-size:10px;color:var(--ink-3);font-weight:600;
+  font-family:'Cascadia Code',Consolas,monospace}
+.side button.on .c{color:var(--olive-mid)}
+.maincol{flex:1;min-width:0;padding:0 12px 0 10px}
+
+/* 随机结果卡 */
+.result{background:var(--surface);border-radius:var(--r-lg);
+  padding:18px;box-shadow:var(--sh-card);position:relative;overflow:hidden}
+.result .why{margin-top:12px;padding-top:12px;border-top:1px dashed var(--line);display:grid;gap:7px}
+.result .why div{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--ink-2)}
+.result .why svg{width:13px;height:13px;stroke:var(--olive);flex:0 0 auto}
+.bar{height:5px;border-radius:var(--r-pill);background:var(--olive-wash);flex:1;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--olive);border-radius:var(--r-pill)}
+.bar.t i{background:var(--terracotta)}.bar.y i{background:var(--mustard)}.bar.m i{background:var(--mauve)}
+
+/* 骰子按钮 */
+.dice-btn{width:150px;height:150px;border-radius:50%;background:var(--terracotta);
+  display:grid;place-items:center;color:#fff;position:relative;margin:6px auto 0;
+  box-shadow:0 14px 34px rgba(222,137,66,.4), inset 0 -6px 0 rgba(0,0,0,.07)}
+.dice-btn svg{width:56px;height:56px;stroke:#fff;stroke-width:1.1}
+.dice-btn b{font-size:16px;font-weight:800;letter-spacing:1px;margin-top:2px}
+.dice-btn:before{content:'';position:absolute;inset:-11px;border-radius:50%;
+  border:1.5px dashed var(--terracotta);opacity:.42;animation:spin 22s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes shake{0%,100%{transform:rotate(0)}20%{transform:rotate(-11deg) scale(1.05)}
+  40%{transform:rotate(9deg)}60%{transform:rotate(-7deg)}80%{transform:rotate(5deg)}}
+.dice-btn:hover svg{animation:shake .62s var(--ease)}
+
+/* 空状态 */
+.empty{display:grid;justify-items:center;gap:10px;text-align:center;padding:26px 20px}
+.empty img{width:170px}
+.empty b{font-size:15px;font-weight:800}
+.empty p{font-size:12.5px;color:var(--ink-3);max-width:26ch}
+
+/* 表单 */
+.field{margin-bottom:14px}
+.field>label{display:flex;align-items:baseline;gap:7px;font-size:12px;font-weight:700;
+  color:var(--ink-2);margin-bottom:7px}
+.field>label em{font-style:normal;font-family:'Cascadia Code',Consolas,monospace;
+  font-size:10.5px;color:var(--ink-3);font-weight:500}
+.field>label i{font-style:normal;color:var(--danger)}
+.inp{width:100%;height:44px;border:0;border-radius:var(--r-md);background:var(--surface-2);
+  box-shadow:inset 0 0 0 1px var(--line);padding:0 14px;font-size:14px;font-family:inherit;color:var(--ink)}
+.inp::placeholder{color:var(--ink-3)}
+.inp:focus{outline:none;box-shadow:inset 0 0 0 1.5px var(--olive)}
+.sel{position:relative}.sel:after{content:'';position:absolute;right:15px;top:19px;width:9px;height:9px;
+  border-right:1.8px solid var(--olive-deep);border-bottom:1.8px solid var(--olive-deep);
+  transform:rotate(45deg);pointer-events:none}
+.upl{display:flex;gap:9px}
+.upl .box{width:66px;height:66px;border-radius:var(--r-md);background:var(--surface-2);
+  box-shadow:inset 0 0 0 1.5px var(--line);display:grid;place-items:center;color:var(--ink-3);
+  font-size:10px;gap:3px;text-align:center;line-height:1.3}
+.upl .box svg{width:20px;height:20px;stroke:var(--olive-mid)}
+.upl img{width:66px;height:66px;border-radius:var(--r-md);object-fit:cover;background:var(--canvas)}
+
+/* 分组小标题（今日点餐） */
+.grp{display:flex;align-items:center;gap:8px;margin:18px 18px 9px}
+.grp b{font-size:12px;font-weight:800;letter-spacing:.04em;color:var(--olive-deep)}
+.grp em{font-style:normal;font-family:'Cascadia Code',Consolas,monospace;font-size:10px;color:var(--ink-3)}
+.grp .dash{flex:1;border-top:1px dashed var(--line)}
+
+/* 日期条 */
+.datebar{display:flex;align-items:center;gap:12px;padding:2px 18px 12px}
+.datebar .d{line-height:1.15}
+.datebar .d b{font-size:19px;font-weight:800;letter-spacing:-.3px}
+.datebar .d em{font-style:normal;display:block;font-family:var(--f-hand);font-size:13px;color:var(--olive)}
+.datebar .nav2{margin-left:auto;display:flex;gap:6px}
+.datebar .nav2 i{width:28px;height:28px;border-radius:50%;background:var(--surface);
+  box-shadow:var(--sh-card);display:grid;place-items:center;font-style:normal}
+.datebar .nav2 svg{width:14px;height:14px;stroke:var(--olive-deep)}
+
+/* 顶部家庭徽章 */
+.fambadge{display:flex;align-items:center;gap:7px;background:var(--surface);
+  border-radius:var(--r-pill);padding:5px 12px 5px 6px;box-shadow:var(--sh-card);
+  margin:0 auto;width:max-content;font-size:12px;font-weight:700;color:var(--ink-2)}
+.fambadge svg{width:13px;height:13px;stroke:var(--mauve)}
+
+/* 遮罩浮层 */
+.sheet{position:absolute;inset:0;z-index:50;display:flex;flex-direction:column;justify-content:flex-end}
+.sheet .mask{position:absolute;inset:0;background:rgba(42,42,36,.42);backdrop-filter:blur(2px)}
+.sheet .pan{position:relative;background:var(--canvas);border-radius:30px 30px 0 0;
+  padding:18px 18px 28px;max-height:74%;overflow-y:auto;scrollbar-width:none;box-shadow:var(--sh-float)}
+.sheet .pan::-webkit-scrollbar{display:none}
+.sheet .grab{width:38px;height:4px;border-radius:var(--r-pill);background:var(--line);margin:0 auto 14px}
+.sheet .hd{display:flex;align-items:center;margin-bottom:16px}
+.sheet .hd b{font-size:18px;font-weight:800}
+.sheet .hd em{font-style:normal;font-family:var(--f-hand);font-size:14px;color:var(--olive);margin-left:8px}
+.sheet .hd .x{margin-left:auto;width:30px;height:30px;border-radius:50%;background:var(--surface);
+  display:grid;place-items:center;box-shadow:var(--sh-card)}
+.sheet .hd .x svg{width:14px;height:14px;stroke:var(--ink-2)}
+
+/* 列表行（菜品管理） */
+.row{display:flex;align-items:center;gap:11px;background:var(--surface);border-radius:var(--r-md);
+  padding:10px 12px;box-shadow:var(--sh-card)}
+.row+.row{margin-top:9px}
+.row .th{width:46px;height:46px;border-radius:var(--r-sm);background:var(--canvas);object-fit:cover;flex:0 0 auto}
+.row .b{flex:1;min-width:0}
+.row .b b{font-size:14.5px;font-weight:700;display:block;line-height:1.3}
+.row .b em{font-style:normal;display:block;font-size:11px;color:var(--ink-3);margin-top:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .ops{display:flex;gap:7px;align-items:center;flex:0 0 auto}
+.row .ops i{width:28px;height:28px;border-radius:50%;background:var(--surface-2);display:grid;
+  place-items:center;font-style:normal}
+.row .ops svg{width:14px;height:14px;stroke:var(--olive-deep)}
+.row .ops svg.del{stroke:var(--danger)}
+
+/* 搜索 */
+.search{display:flex;align-items:center;gap:9px;background:var(--surface);border-radius:var(--r-pill);
+  padding:0 15px;height:42px;box-shadow:var(--sh-card)}
+.search svg{width:16px;height:16px;stroke:var(--ink-3);flex:0 0 auto}
+.search span{font-size:13.5px;color:var(--ink-3)}
+.search .fil{margin-left:auto;width:28px;height:28px;border-radius:50%;background:var(--olive-wash);
+  display:grid;place-items:center}
+.search .fil svg{width:14px;height:14px;stroke:var(--olive-deep)}
+
+/* 收藏网格 */
+.net{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.net .c{background:var(--surface);border-radius:var(--r-lg);padding:9px;box-shadow:var(--sh-card);position:relative}
+.net .c img{width:100%;aspect-ratio:1;object-fit:cover;background:var(--canvas);border-radius:var(--r-md)}
+.net .c .n{font-size:13.5px;font-weight:800;margin-top:8px;line-height:1.3}
+.net .c .s{font-size:10.5px;color:var(--ink-3);margin-top:2px}
+.net .c .badge{position:absolute;top:15px;right:15px;background:var(--mustard);color:#fff;
+  font-size:10px;font-weight:800;padding:2px 8px;border-radius:var(--r-pill);
+  box-shadow:0 3px 8px rgba(216,167,48,.4)}
+.net .c .badge.m{background:var(--mauve);box-shadow:0 3px 8px rgba(156,122,150,.4)}
+
+/* 统计条 */
+.stats{display:flex;background:var(--surface);border-radius:var(--r-lg);padding:14px 6px;box-shadow:var(--sh-card)}
+.stats div{flex:1;text-align:center;position:relative}
+.stats div+div:before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);
+  width:1px;height:26px;background:var(--line)}
+.stats b{display:block;font-size:19px;font-weight:800;color:var(--olive-deep);letter-spacing:-.5px}
+.stats em{display:block;font-style:normal;font-size:10.5px;color:var(--ink-3);margin-top:1px}
+
+/* 异常态：骨架 / 提示条 / 失败 */
+.sk{border-radius:var(--r-lg);background:var(--surface);padding:11px;display:flex;gap:12px;
+  align-items:center;box-shadow:var(--sh-card)}
+.sk i{display:block;border-radius:var(--r-sm);background:linear-gradient(90deg,#F1EFE7 25%,#E7E4D6 37%,#F1EFE7 63%);
+  background-size:400% 100%;animation:sk 1.4s var(--ease) infinite;font-style:normal}
+@keyframes sk{0%{background-position:100% 50%}100%{background-position:0 50%}}
+.banner{display:flex;gap:10px;align-items:flex-start;border-radius:var(--r-md);padding:12px 14px;
+  font-size:12.5px;line-height:1.6}
+.banner svg{width:16px;height:16px;flex:0 0 auto;margin-top:2px}
+.banner.info{background:var(--olive-wash);color:var(--olive-deep)}
+.banner.info svg{stroke:var(--olive-deep)}
+.banner.warn{background:var(--terracotta-wash);color:#95531F}
+.banner.warn svg{stroke:#95531F}
+.banner.err{background:#F7E4DC;color:#8E3F22}
+.banner.err svg{stroke:var(--danger)}
+.banner b{display:block;font-size:13px;margin-bottom:1px}
+.off-line{display:grid;place-items:center;gap:6px;padding:18px;border-radius:var(--r-lg);
+  border:1.5px dashed var(--line);color:var(--ink-3);font-size:12.5px;text-align:center}
+
+/* 动效说明卡 */
+.motion-row{display:flex;align-items:center;gap:14px;padding:13px 0;border-top:1px dashed var(--line)}
+.motion-row:first-child{border-top:0}
+.motion-demo{width:46px;height:46px;border-radius:var(--r-md);background:var(--olive-wash);
+  display:grid;place-items:center;flex:0 0 auto;position:relative;overflow:hidden}
+.motion-demo .dot{width:16px;height:16px;border-radius:50%;background:var(--olive)}
+.m1 .dot{transition:transform var(--t-fast) var(--ease)}
+.m1:hover .dot{transform:scale(1.4)}
+.m2 .dot{transition:transform var(--t) var(--ease-back)}
+.m2:hover .dot{transform:translateY(-11px)}
+.m3 .dot{transition:all var(--t-slow) var(--ease)}
+.m3:hover .dot{transform:rotate(180deg) scale(.7);background:var(--terracotta)}
+.m4 .dot{animation:breathe 2.6s var(--ease) infinite}
+@keyframes breathe{0%,100%{transform:scale(1);opacity:.85}50%{transform:scale(1.22);opacity:1}}
+.motion-row .t b{font-size:13.5px;display:block}
+.motion-row .t span{font-size:11.5px;color:var(--ink-3);font-family:'Cascadia Code',Consolas,monospace}
+
+/* 代码块 */
+pre{background:#2B2C26;color:#E8E6DA;border-radius:var(--r-lg);padding:20px 22px;
+  font-family:'Cascadia Code',Consolas,monospace;font-size:12.5px;line-height:1.85;
+  overflow-x:auto;scrollbar-width:thin}
+pre .k{color:#C6C57E}pre .v{color:#DE8942}pre .c{color:#8A8C7C;font-style:italic}pre .s{color:#9C7A96}
+
+/* 桌面/平板框 */
+.desk{width:100%;max-width:1180px;border-radius:20px;overflow:hidden;background:var(--canvas);
+  box-shadow:var(--sh-float),inset 0 0 0 1px rgba(0,0,0,.05)}
+.desk .bar{height:34px;display:flex;align-items:center;gap:6px;padding:0 14px;background:rgba(255,255,255,.6)}
+.desk .bar i{width:9px;height:9px;border-radius:50%;background:var(--line)}
+.desk .bar i:first-child{background:#E8A08C}
+.desk .bar span{margin-left:10px;font-size:11px;color:var(--ink-3);
+  font-family:'Cascadia Code',Consolas,monospace}
+.bp{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.bp div{background:var(--surface-2);border-radius:var(--r-md);padding:13px 15px;border:1px solid var(--line)}
+.bp b{font-family:'Cascadia Code',Consolas,monospace;font-size:12px;color:var(--olive-deep);display:block}
+.bp span{font-size:12px;color:var(--ink-2);display:block;margin-top:4px;line-height:1.55}
+
+.foot{margin-top:70px;padding-top:26px;border-top:1px solid var(--line);
+  display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;
+  font-size:12px;color:var(--ink-3)}
+.foot .en{font-family:var(--f-hand);font-size:19px;color:var(--olive-mid)}
+</style>
+</head>
+<body>
+
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M4.2 11.2 12 4.4l7.8 6.8V19a1 1 0 0 1-1 1h-4.6v-5.2H9.8V20H5.2a1 1 0 0 1-1-1z"/></symbol>
+<symbol id="i-order" viewBox="0 0 24 24"><path d="M6.2 3.6h11.6v16.8l-2.9-1.6-2.9 1.6-2.9-1.6-2.9 1.6z"/><path d="M9.2 8.2h5.6M9.2 12h5.6M9.2 15.4h3.4"/></symbol>
+<symbol id="i-dice" viewBox="0 0 24 24"><rect x="4.2" y="4.2" width="15.6" height="15.6" rx="4.4"/><path stroke-width="3.1" d="M8.9 8.9h.01M15.1 8.9h.01M12 12h.01M8.9 15.1h.01M15.1 15.1h.01"/></symbol>
+<symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 19.7S4.4 15 4.4 9.8A3.9 3.9 0 0 1 12 7.9a3.9 3.9 0 0 1 7.6 1.9C19.6 15 12 19.7 12 19.7z"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.3"/><path d="M12 7.4V12l3.3 2.1"/></symbol>
+<symbol id="i-pot" viewBox="0 0 24 24"><path d="M5 10.6h14v4.9a4.2 4.2 0 0 1-4.2 4.2H9.2A4.2 4.2 0 0 1 5 15.5z"/><path d="M3.2 12.3H5m14 0h1.8"/><path d="M7.2 10.6c0-2.2 1.6-3.7 4.8-3.7s4.8 1.5 4.8 3.7"/><path d="M12 6.9V5.1"/></symbol>
+<symbol id="i-bowl" viewBox="0 0 24 24"><path d="M3.8 11.2h16.4a8.2 8.2 0 0 1-16.4 0z"/><path d="M8.6 4.6 17.4 9.4M11 3.8l7 5.4"/></symbol>
+<symbol id="i-leaf" viewBox="0 0 24 24"><path d="M5 19.2C5 11.4 10.9 5.4 19.2 5.4c0 8-5.9 13.8-14.2 13.8z"/><path d="M5.4 19c3.6-4 6.8-6.4 10.4-7.8"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5.4v13.2M5.4 12h13.2"/></symbol>
+<symbol id="i-minus" viewBox="0 0 24 24"><path d="M5.6 12h12.8"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.4"/><path d="M15.6 15.8 20 20.2"/></symbol>
+<symbol id="i-edit" viewBox="0 0 24 24"><path d="M4.4 19.6 5.6 15 15.8 4.8l3.4 3.4L9 18.2z"/><path d="M13.6 6.8l3.4 3.4"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.8 7h14.4M9.4 7V4.4h5.2V7M6.8 7l1 13.2h8.4L17.2 7"/></symbol>
+<symbol id="i-right" viewBox="0 0 24 24"><path d="M9.4 5.4 16.2 12l-6.8 6.6"/></symbol>
+<symbol id="i-left" viewBox="0 0 24 24"><path d="M14.6 5.4 7.8 12l6.8 6.6"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24"><path d="M5.6 9.4 12 15.8l6.4-6.4"/></symbol>
+<symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M4.8 20c0-4 3.2-6.2 7.2-6.2S19.2 16 19.2 20"/></symbol>
+<symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3.6 2.7 5.4 5.9.9-4.3 4.2 1 5.9L12 17.3 6.7 20l1-5.9L3.4 9.9l5.9-.9z"/></symbol>
+<symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6.4h16M7 12h10M9.8 17.6h4.4"/></symbol>
+<symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8.8h3.2L8.8 6.4h6.4L16.8 8.8H20V19H4z"/><circle cx="12" cy="13.4" r="3.2"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M6.2 6.2 17.8 17.8M17.8 6.2 6.2 17.8"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.6 4.6 4.6L19 6.8"/></symbol>
+<symbol id="i-swap" viewBox="0 0 24 24"><path d="M4 7.2h4l8 9.6h3.6M4 16.8h4l8-9.6h3.6"/><path d="m17 4.4 3 3.2-3 3.2M17 13.6l3 3.2-3 3.2"/></symbol>
+<symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 3.4c3.2 4 5.2 5.8 5.2 9.2a5.2 5.2 0 0 1-10.4 0c0-2 .9-3.2 1.9-4.2.2 2 .9 3 1.8 3.2.6-3.2-.9-5.4 1.5-8.2z"/></symbol>
+<symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></symbol>
+<symbol id="i-book" viewBox="0 0 24 24"><path d="M5 4.2h9.6a3.4 3.4 0 0 1 3.4 3.4V20H8.4A3.4 3.4 0 0 1 5 16.6z"/><path d="M5 15.4h13"/></symbol>
+<symbol id="i-fork" viewBox="0 0 24 24"><path d="M8 3.6v7.2a2.2 2.2 0 0 0 4.4 0V3.6M10.2 13V20.4"/><path d="M16.4 3.6c2 0 2.6 2.6 2.6 5.4s-.8 4-2.6 4v7.4"/></symbol>
+<symbol id="i-tag" viewBox="0 0 24 24"><path d="M4.4 11.8V4.8h7l8.2 8.2-7 7z"/><path stroke-width="2.8" d="M8.2 8.4h.01"/></symbol>
+<symbol id="i-list" viewBox="0 0 24 24"><path d="M8.6 6.6h11M8.6 12h11M8.6 17.4h11"/><path stroke-width="2.8" d="M4.8 6.6h.01M4.8 12h.01M4.8 17.4h.01"/></symbol>
+<symbol id="i-menu3" viewBox="0 0 24 24"><path d="M4.4 4.6h15.2v14.8H4.4z"/><path d="M4.4 9.2h15.2M9 9.2v10.2"/></symbol>
+<symbol id="i-cal" viewBox="0 0 24 24"><rect x="4" y="5.6" width="16" height="14.4" rx="3.2"/><path d="M4 10.2h16M8.2 3.6v3.4M15.8 3.6v3.4"/><path stroke-width="2.6" d="M8.4 14.2h.01M12 14.2h.01M15.6 14.2h.01"/></symbol>
+</defs>
+</svg>
+
+<div class="wrap">
+
+<header class="doc-head">
+  <div class="kicker">a lazy day in the family kitchen</div>
+  <h1>家庭点餐系统 · <em>植物手账</em>风格 UI 设计稿</h1>
+  <p class="lede">把家庭菜单写成一本摊在厨房桌上的植物手账：米白纸感底、水彩食材主视觉、单色橄榄绿线描图标、纯白大圆角卡片。本稿覆盖设计语言定义与 README 第一阶段核心 6 页高保真原型，可直接作为 Vue 3 + Vite 的实现基准。</p>
+  <div class="doc-meta">
+    <span>风格代号 Botanical Journal</span>
+    <span>移动端优先 390×844</span>
+    <span>断点 640 / 1024</span>
+    <span>技术栈 Vue 3 + Vite + PWA + Supabase</span>
+    <span>取色 参考图面积聚类</span>
+    <span>更新 2026-10-02</span>
+  </div>
+</header>
+
+<nav class="nav">
+  <a href="#s-style">01 风格定位</a>
+  <a href="#s-color">02 色板</a>
+  <a href="#s-type">03 字体排版</a>
+  <a href="#s-comp">04 组件规范</a>
+  <a href="#s-illo">05 插画与图标</a>
+  <a href="#s-motion">06 动效</a>
+  <a href="#s-pages">07 核心 6 页</a>
+  <a href="#s-resp">08 响应式</a>
+  <a href="#s-code">09 Vue 落地</a>
+</nav>
+
+<!-- ============ 01 风格定位 ============ -->
+<section id="s-style">
+  <div class="sec-head">
+    <span class="n">01</span><h2>风格定位</h2><span class="en">design direction</span>
+    <p>参考图的本质不是"可爱"，而是 <b>手绘情绪层（插画/线描/手写体）与信息层（卡片/列表/数字）严格分离</b>。情绪负责让人愿意每天打开，信息负责快速决策。所有规则都围绕这条分界线展开。</p>
+  </div>
+  <div class="grid g2">
+    <div class="panel">
+      <div class="h3">五条支柱<span class="en">pillars</span></div>
+      <ul class="ticks">
+        <li><b>纸感米白底</b> — 全站唯一底色 <code>#F4F1E9</code>，永不使用纯灰或深色背景；卡片用纯白浮在纸上。</li>
+        <li><b>水彩承担情绪</b> — 首页主视觉、空状态、结果卡用插画；列表与表单永远不放插画，避免信息噪声。</li>
+        <li><b>单色橄榄线描图标</b> — 1.6px 圆头描边、无填充、无多色，允许路径轻微不规整以保留手绘感。</li>
+        <li><b>双语排版锁</b> — 小字号大写英文（或手写体英文）在上、中文主标在下，是这套风格的签名节奏。</li>
+        <li><b>层级靠留白不靠线</b> — 卡片间距 12px、区块间距 22px；分割线只允许虚线，且只出现在同一卡片内部。</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <div class="h3">明确不做<span class="en">guard rails</span></div>
+      <ul class="ticks cross">
+        <li>渐变填充、玻璃拟态、发光描边 —— 与纸感互斥。</li>
+        <li>纯黑 <code>#000</code> 文字；正文一律暖炭黑 <code>#2A2A24</code>。</li>
+        <li>彩色/面性图标，或把 emoji 当 UI 图标。README 里的 <code>🎲</code> 只是文档速记，界面上用线描骰子替代。</li>
+        <li>重阴影、卡片套卡片超过 2 层。</li>
+        <li>用色相表达装饰。四个点缀色（陶土橙/芥末黄/灰紫/橄榄）只绑定语义：行动 / 常吃 / 收藏 / 常规。</li>
+        <li>首屏放超过 1 张水彩插画——会压过信息层。</li>
+      </ul>
+    </div>
+  </div>
+  <div class="panel" style="margin-top:16px">
+    <div class="h3">情绪关键词<span class="en">mood</span></div>
+    <div class="spec-row" style="margin-top:14px">
+      <div class="chip on">手账</div><div class="chip on">水彩</div><div class="chip on">菜园</div>
+      <div class="chip on">慢生活</div><div class="chip on">纸质</div><div class="chip on">温暖</div>
+      <div class="chip on">家常</div><div class="chip on">不催促</div>
+    </div>
+    <p class="hint" style="margin-top:16px">落地判据：任何新页面先问一句 —— <b>"这一屏放进一本植物手账里违和吗？"</b>违和就回退到米白 + 白卡 + 线描三件套。</p>
+  </div>
+</section>
+
+<!-- ============ 02 色板 ============ -->
+<section id="s-color">
+  <div class="sec-head">
+    <span class="n">02</span><h2>色板</h2><span class="en">palette</span>
+    <p>全部色值由参考图按面积聚类取色得到，不是估的。米白底占屏 33%、纯白卡 36%，二者构成 70% 的视觉面积；橄榄绿是唯一"品牌色"，其余三色是插画里摘出来的点缀，用量必须 &lt; 8%。</p>
+  </div>
+
+  <div class="grid g4">
+    <div class="sw"><div class="chipcolor dark" style="background:#F4F1E9"><i>33% 面积</i></div>
+      <div class="body"><div class="role">亚麻米白 Canvas</div><div class="tok">--canvas</div><div class="hex">#F4F1E9</div>
+      <div class="use">全站唯一页面底色。插画背景已归一化到此色，因此插画可以"无边框"融进页面。</div></div></div>
+    <div class="sw"><div class="chipcolor dark" style="background:#FFFFFF;border-bottom:1px solid var(--line)"><i style="color:#A6A598">36% 面积</i></div>
+      <div class="body"><div class="role">纸白 Surface</div><div class="tok">--surface</div><div class="hex">#FFFFFF</div>
+      <div class="use">卡片、列表项、导航浮层。永远带 --sh-card 一档轻阴影。</div></div></div>
+    <div class="sw"><div class="chipcolor dark" style="background:#FBF9F3"><i style="color:#A6A598">内部分区</i></div>
+      <div class="body"><div class="role">次级纸白</div><div class="tok">--surface-2</div><div class="hex">#FBF9F3</div>
+      <div class="use">输入框底、卡片内的浅底块、图标底座。避免用灰色。</div></div></div>
+    <div class="sw"><div class="chipcolor" style="background:#8E9348"><i>品牌主色</i></div>
+      <div class="body"><div class="role">橄榄苔绿 Olive</div><div class="tok">--olive</div><div class="hex">#8E9348</div>
+      <div class="use">图标线描、主按钮、选中态。白底对比度 3.3:1 → 只能用于图形与大字号。</div></div></div>
+    <div class="sw"><div class="chipcolor" style="background:#6E7334"><i>可读版</i></div>
+      <div class="body"><div class="role">深橄榄 Olive Deep</div><div class="tok">--olive-deep</div><div class="hex">#6E7334</div>
+      <div class="use">所有小字号绿色文字、图标 hover。白底 5.0:1，过 AA。</div></div></div>
+    <div class="sw"><div class="chipcolor" style="background:#C6C57E"><i>浅苔绿</i></div>
+      <div class="body"><div class="role">中调苔绿</div><div class="tok">--olive-mid</div><div class="hex">#C6C57E</div>
+      <div class="use">次级描边、装饰线、箭头。参考图里花与叶的中间调。</div></div></div>
+    <div class="sw"><div class="chipcolor dark" style="background:#EDF0DA"><i style="color:#6E7334">选中态底</i></div>
+      <div class="body"><div class="role">橄榄淡底</div><div class="tok">--olive-wash</div><div class="hex">#EDF0DA</div>
+      <div class="use">chip/分段控件选中底色、图标圆底、进度条槽。取代一切灰色 tag 底。</div></div></div>
+    <div class="sw"><div class="chipcolor" style="background:#DE8942"><i>主行动</i></div>
+      <div class="body"><div class="role">陶土橙 Terracotta</div><div class="tok">--terracotta</div><div class="hex">#DE8942</div>
+      <div class="use">唯一"现在就做"色：随机摇骰、确认点餐、辣度峰值。一屏最多一处大面积使用。</div></div></div>
+    <div class="sw"><div class="chipcolor" style="background:#D8A730"><i>高频</i></div>
+      <div class="body"><div class="role">芥末黄 Mustard</div><div class="tok">--mustard</div><div class="hex">#D8A730</div>
+      <div class="use">绑定"常吃 / 吃过次数 / 高频"。参考图小黄花色。白字对比不足，只做底色与角标。</div></div></div>
+    <div class="sw"><div class="chipcolor" style="background:#9C7A96"><i>收藏</i></div>
+      <div class="body"><div class="role">灰紫 Mauve</div><div class="tok">--mauve</div><div class="hex">#9C7A96</div>
+      <div class="use">绑定"收藏 / 家庭成员"。参考图葡萄色。克制使用，不与陶土橙同时大面积出现。</div></div></div>
+    <div class="sw"><div class="chipcolor" style="background:#2A2A24"><i>正文</i></div>
+      <div class="body"><div class="role">暖炭黑 Ink</div><div class="tok">--ink</div><div class="hex">#2A2A24</div>
+      <div class="use">正文与标题。米白底上 12.8:1。禁止 #000（会显得"电子"，破坏纸感）。</div></div></div>
+    <div class="sw"><div class="chipcolor" style="background:#C0603F"><i>危险</i></div>
+      <div class="body"><div class="role">警示红</div><div class="tok">--danger</div><div class="hex">#C0603F</div>
+      <div class="use">删除、停用、失败态。是陶土橙的暗化版，不引入新色相，保持水彩调。</div></div></div>
+  </div>
+
+  <div class="panel" style="margin-top:16px">
+    <div class="h3">语义绑定表<span class="en">color = meaning</span></div>
+    <p class="hint" style="margin:6px 0 14px">这套风格最容易崩坏的地方是"点缀色乱用"。固定绑定，谁都不许改：</p>
+    <table>
+      <tr><th>色</th><th>绑定语义</th><th>出现位置</th><th>面积上限</th></tr>
+      <tr><td>橄榄 --olive</td><td>常规 / 品牌 / 可选中</td><td>图标、主按钮、选中 chip、Tab 文字</td><td>—</td></tr>
+      <tr><td>陶土橙 --terracotta</td><td>行动召唤 + 辣</td><td>摇骰按钮、确认点餐、辣度实心、加号（点餐态）</td><td>每屏 1 处主块</td></tr>
+      <tr><td>芥末黄 --mustard</td><td>常吃 / 高频 / 统计</td><td>常吃角标、eat_count 数字、进度条</td><td>角标级</td></tr>
+      <tr><td>灰紫 --mauve</td><td>收藏 / 人</td><td>心形、成员头像、偏好标记</td><td>角标级</td></tr>
+      <tr><td>警示 --danger</td><td>不可逆操作</td><td>删除图标、停用开关、表单错误</td><td>图标级</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ============ 03 字体排版 ============ -->
+<section id="s-type">
+  <div class="sec-head">
+    <span class="n">03</span><h2>字体与排版</h2><span class="en">typography</span>
+    <p>中文用系统无衬线（不加载 Web 字体，PWA 首屏零阻塞）；手写体 <b>Caveat</b> 只用于英文装饰行，字体栈带 cursive 兜底，离线也不塌。层级靠字号与字重差，不靠颜色差。</p>
+  </div>
+  <div class="grid g2">
+    <div class="panel">
+      <div class="type-row">
+        <div style="font-size:34px;font-weight:800;letter-spacing:-.5px;line-height:1.15">今天吃什么</div>
+        <div class="spec">Display / 34 / 800<br>letter-spacing -.5px</div>
+      </div>
+      <div class="type-row">
+        <div style="font-family:var(--f-hand);font-size:26px;color:var(--olive);line-height:1.1">a lazy day in the kitchen</div>
+        <div class="spec">Hand / 26 / 400<br>Caveat, cursive</div>
+      </div>
+      <div class="type-row">
+        <div style="font-size:20px;font-weight:800;letter-spacing:-.3px">页面标题 Page Title</div>
+        <div class="spec">H1 / 20 / 800</div>
+      </div>
+      <div class="type-row">
+        <div style="font-size:17px;font-weight:800;letter-spacing:-.2px">卡片主标 · 宫保鸡丁</div>
+        <div class="spec">Title / 17 / 800<br>菜品名 15 / 800</div>
+      </div>
+      <div class="type-row">
+        <div style="font-size:15px">正文，用于描述与说明文字</div>
+        <div class="spec">Body / 15 / 400<br>line-height 1.6</div>
+      </div>
+      <div class="type-row">
+        <div style="font-size:12.5px;color:var(--ink-2)">次要信息：距上次吃 21 天 · 鸡肉 + 炒</div>
+        <div class="spec">Caption / 12.5 / 400<br>--ink-2</div>
+      </div>
+      <div class="type-row">
+        <div style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);font-weight:600">order · 双语小标</div>
+        <div class="spec">Micro / 10 / 600<br>tracking .14em</div>
+      </div>
+      <div class="type-row">
+        <div style="font-family:'Cascadia Code',Consolas,monospace;font-size:13px;color:var(--olive-deep)">19 次 · 20 min · 3 人</div>
+        <div class="spec">Num / 等宽 / 500<br>数字一律等宽</div>
+      </div>
+    </div>
+    <div style="display:grid;gap:16px">
+      <div class="panel">
+        <div class="h3">双语排版锁<span class="en">the signature</span></div>
+        <p class="hint" style="margin:6px 0 14px">参考图最有辨识度的排版特征。三种合法组合，其余一律不允许：</p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <div class="card" style="flex:1 1 130px;text-align:center;padding:18px 12px">
+            <div class="bi"><em>order</em><b>点单</b></div>
+            <div class="hint" style="margin-top:8px;font-size:10.5px">A · 卡片入口<br>英文大写在上</div>
+          </div>
+          <div class="card" style="flex:1 1 130px;text-align:center;padding:18px 12px">
+            <div style="font-family:var(--f-hand);font-size:15px;color:var(--olive);line-height:1">today's menu</div>
+            <div style="font-size:16px;font-weight:800;margin-top:2px">今日点餐</div>
+            <div class="hint" style="margin-top:8px;font-size:10.5px">B · 区块标题<br>手写体英文在上</div>
+          </div>
+          <div class="card" style="flex:1 1 130px;text-align:center;padding:18px 12px">
+            <div style="font-size:16px;font-weight:800">我的收藏</div>
+            <div style="font-family:var(--f-hand);font-size:14px;color:var(--olive-mid);line-height:1;margin-top:2px">favorites</div>
+            <div class="hint" style="margin-top:8px;font-size:10.5px">C · 页面标题<br>英文手写在下</div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="h3">栅格与间距<span class="en">layout</span></div>
+        <ul class="ticks">
+          <li>手机左右安全边距固定 <b>18px</b>，卡片内边距 <b>16px</b>（大图卡 20px）。</li>
+          <li>间距只用 4/8/12/16/20/28/40；卡片间 12px，区块间 22px。</li>
+          <li>菜品列表单列；收藏/常吃双列；首页宫格 1 大 + 2 小 + 2 宽行（复刻参考图节奏）。</li>
+          <li>触控目标最小 <b>44×44px</b>，加号按钮视觉 32px 但热区补足到 44px。</li>
+          <li>底部操作条与 TabBar 互斥，同屏只出现一个。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- ============ 04 组件规范 ============ -->
+<section id="s-comp">
+  <div class="sec-head">
+    <span class="n">04</span><h2>组件规范</h2><span class="en">components</span>
+    <p>以下每个样例都是<b>真实可交互的 DOM</b>，不是截图 —— 样式类名即 Vue 组件的实现基准。hover / 点按可试。</p>
+  </div>
+
+  <div class="grid g2">
+    <div class="spec-box">
+      <div class="lbl">Button · 按钮</div>
+      <div class="spec-row">
+        <button class="btn p"><svg class="ic" style="width:18px;height:18px"><use href="#i-order"/></svg>我要点餐</button>
+        <button class="btn w"><svg class="ic" style="width:18px;height:18px"><use href="#i-dice"/></svg>摇一摇</button>
+        <button class="btn o">换个菜</button>
+        <button class="btn g">去首页</button>
+      </div>
+      <div class="spec-row" style="margin-top:12px">
+        <button class="btn p sm">小按钮</button>
+        <button class="btn o sm">描边小</button>
+        <button class="btn p xs">微</button>
+        <button class="btn p" disabled>禁用态 42%</button>
+      </div>
+      <p class="hint" style="margin-top:12px">高度 46 / 34 / 28。主按钮<b>一屏最多一个</b>；陶土橙只给"随机"和"确认点餐"两个动作。</p>
+    </div>
+
+    <div class="spec-box">
+      <div class="lbl">Chip · 筛选筹码</div>
+      <div class="chips">
+        <div class="chip">全部</div><div class="chip on">鸡肉</div><div class="chip">牛肉</div>
+        <div class="chip warm on">红烧</div><div class="chip">清炒</div>
+        <div class="chip m on"><svg class="ic" style="width:14px;height:14px;stroke:#fff"><use href="#i-heart"/></svg>收藏</div>
+        <div class="chip y on"><svg class="ic" style="width:14px;height:14px;stroke:#fff"><use href="#i-clock"/></svg>常吃</div>
+      </div>
+      <div class="chips nowrap" style="margin-top:12px">
+        <div class="chip on">炒</div><div class="chip">炖</div><div class="chip">蒸</div><div class="chip">煮</div>
+        <div class="chip">炸</div><div class="chip">煎</div><div class="chip">烤</div><div class="chip">焖</div>
+        <div class="chip">卤</div><div class="chip">红烧</div><div class="chip">糖醋</div><div class="chip">凉拌</div>
+      </div>
+      <p class="hint" style="margin-top:12px">做法 12 项放不下 → 横向滚动，<b>不换行折成两排</b>（会挤压菜品区）。选中态填充，未选中态只用发丝内描边，不用灰底。</p>
+    </div>
+
+    <div class="spec-box">
+      <div class="lbl">Segmented · 分段控件</div>
+      <div class="seg" style="max-width:230px"><i>早餐</i><i class="on">正餐</i></div>
+      <div class="seg warm" style="max-width:290px;margin-top:12px"><i>随机一道</i><i class="on">随机配菜</i><i>随机一桌</i></div>
+      <div class="seg" style="max-width:290px;margin-top:12px"><i>收藏</i><i class="on">常吃</i></div>
+      <p class="hint" style="margin-top:12px">选中底用 <code>--olive-wash</code> + 深橄榄字，比"整条填色"更贴纸感。随机页用 warm 变体强调这是行动页。</p>
+    </div>
+
+    <div class="spec-box">
+      <div class="lbl">Tag · 语义标签 / Spicy · 辣度</div>
+      <div class="spec-row">
+        <span class="tag">下饭</span><span class="tag hot">辣</span><span class="tag freq">常吃 19 次</span>
+        <span class="tag fam">适合儿童</span><span class="tag off">已停用</span>
+      </div>
+      <div class="spec-row" style="margin-top:14px;gap:18px">
+        <span class="spicy"><i class="on"></i><i></i><i></i><i></i><i></i></span>
+        <span class="spicy"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></span>
+        <span class="spicy"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></span>
+        <span class="hint">微辣 / 中辣 / 爆辣</span>
+      </div>
+      <p class="hint" style="margin-top:12px">标签底色永远是对应语义色的 <b>wash 版</b>，绝不用 #eee 灰。辣度五格，实心用陶土橙、空槽用芥末黄 22%。</p>
+    </div>
+
+    <div class="spec-box">
+      <div class="lbl">Stepper · 步进 / Switch · 开关 / Avatar · 头像</div>
+      <div class="spec-row" style="gap:18px">
+        <div class="stepper"><button><svg class="ic"><use href="#i-minus"/></svg></button><span>2</span><button><svg class="ic"><use href="#i-plus"/></svg></button></div>
+        <div class="sw2"></div>
+        <div class="sw2 off"></div>
+        <div class="avstack"><div class="av">爸</div><div class="av m">妈</div><div class="av t">娃</div><div class="av lv">+</div></div>
+      </div>
+      <p class="hint" style="margin-top:14px">开关只有橄榄绿/灰米两态，不用红绿。成员头像用灰紫区分"人"与"菜"，加号是描边版表示"邀请"。</p>
+    </div>
+
+    <div class="spec-box">
+      <div class="lbl">Search · 搜索 / Row · 管理行</div>
+      <div class="search"><svg class="ic"><use href="#i-search"/></svg><span>搜菜名、食材、做法</span>
+        <div class="fil"><svg class="ic"><use href="#i-filter"/></svg></div></div>
+      <div style="margin-top:12px">
+        <div class="row"><img class="th" src="assets/dish-kungpao.png" alt="">
+          <div class="b"><b>宫保鸡丁</b><em>正餐 · 荤菜 · 鸡肉 + 炒 · 20min</em></div>
+          <div class="ops"><i><svg class="ic"><use href="#i-edit"/></svg></i><i><svg class="ic del"><use href="#i-trash"/></svg></i><div class="sw2"></div></div>
+        </div>
+        <div class="row"><img class="th" src="assets/dish-greens.png" alt="">
+          <div class="b"><b>清炒小白菜</b><em>正餐 · 素菜 · 蔬菜 + 炒 · 8min</em></div>
+          <div class="ops"><i><svg class="ic"><use href="#i-edit"/></svg></i><i><svg class="ic del"><use href="#i-trash"/></svg></i><div class="sw2 off"></div></div>
+        </div>
+      </div>
+      <p class="hint" style="margin-top:12px">删除只用图标不用文字按钮，省横向空间；停用开关放最右，符合拇指落点。</p>
+    </div>
+  </div>
+
+  <div class="grid g2" style="margin-top:16px">
+    <div class="spec-box">
+      <div class="lbl">DishCard · 菜品卡（三种状态）</div>
+      <div class="dish"><div class="thw"><img src="assets/dish-ribs.png" alt="红烧排骨"></div>
+        <div class="b"><div class="nm"><b>红烧排骨</b>
+          <svg class="ic fav" style="width:15px;height:15px;fill:var(--mauve);stroke:none"><use href="#i-heart"/></svg></div>
+          <div class="meta">猪肉 + 红烧 · 45 min · 吃过 19 次</div>
+          <div class="tags"><span class="tag freq">常吃</span><span class="tag">下饭</span><span class="tag fam">适合儿童</span></div></div>
+        <div class="rt"><div class="add"><svg class="ic"><use href="#i-plus"/></svg></div></div>
+      </div>
+      <div class="dish"><div class="thw"><img src="assets/dish-soup.png" alt="紫菜蛋花汤"></div>
+        <div class="b"><div class="nm"><b>紫菜蛋花汤</b></div>
+          <div class="meta">其他 · 12 min · 很久没吃了</div>
+          <div class="tags"><span class="tag">清淡</span><span class="tag off">距上次 47 天</span></div></div>
+        <div class="rt"><div class="stepper"><button><svg class="ic"><use href="#i-minus"/></svg></button><span>1</span><button><svg class="ic"><use href="#i-plus"/></svg></button></div></div>
+      </div>
+      <div class="dish" style="opacity:.5"><div class="thw"><img src="assets/dish-hotpot.png" alt="已停用"></div>
+        <div class="b"><div class="nm"><b>番茄牛腩锅</b></div>
+          <div class="meta">火锅 · 牛肉 + 焖 · 已停用，不出现在点餐列表</div>
+          <div class="tags"><span class="tag off">已停用</span></div></div>
+        <div class="rt"><div class="add" style="background:var(--surface-2);box-shadow:none"><svg class="ic" style="stroke:var(--ink-3)"><use href="#i-plus"/></svg></div></div>
+      </div>
+      <p class="hint" style="margin-top:12px">未选 → 加号；已选 → 就地变步进器，<b>不跳页、不弹窗</b>（README 33.1「少页面跳转」）。停用菜品只在管理页可见。</p>
+    </div>
+
+    <div class="spec-box">
+      <div class="lbl">Nav · TabBar · Dock · FAB</div>
+      <div style="position:relative;background:var(--surface-2);border-radius:var(--r-lg);padding:16px;overflow:hidden">
+        <div class="navbar" style="padding:0 0 10px">
+          <div class="back"><svg class="ic"><use href="#i-left"/></svg></div>
+          <div class="t"><b>我要点餐</b><em>order your meal</em></div>
+          <div class="act"><div class="iconbtn"><svg class="ic"><use href="#i-search"/></svg></div></div>
+        </div>
+        <div style="height:104px"></div>
+        <div style="position:relative;height:74px">
+          <div class="tabbar" style="position:absolute;left:0;right:0;bottom:0;box-shadow:var(--sh-card)">
+            <a class="on"><svg class="ic"><use href="#i-home"/></svg><span>首页</span></a>
+            <a><svg class="ic"><use href="#i-order"/></svg><span>点餐</span></a>
+            <a class="dice"><div class="d"><svg class="ic"><use href="#i-dice"/></svg></div><span>随机</span></a>
+            <a><svg class="ic"><use href="#i-book"/></svg><span>常吃</span></a>
+            <a><svg class="ic"><use href="#i-user"/></svg><span>我的</span></a>
+          </div>
+        </div>
+      </div>
+      <div class="spec-row" style="margin-top:14px;gap:16px;align-items:center">
+        <div class="dock" style="position:relative;background:var(--surface-2);border-radius:var(--r-lg);padding:14px;flex:1">
+          <div class="sum"><b>已选 4 道 · 2 人份</b><em>晚餐 · 草稿，尚未确认</em></div>
+          <button class="btn w" style="margin-left:auto">确认点餐</button>
+        </div>
+      </div>
+      <p class="hint" style="margin-top:12px">TabBar 中间凸起骰子 = 把 README 的核心功能提到全局导航层。Dock 与 TabBar 互斥：进入"选菜"上下文时 TabBar 让位给 Dock。</p>
+    </div>
+  </div>
+
+  <div class="grid g3" style="margin-top:16px">
+    <div class="spec-box">
+      <div class="lbl">Empty · 空状态</div>
+      <div class="empty" style="padding:14px 8px">
+        <img src="assets/hero-empty.png" alt="空状态">
+        <b>今天还没点菜</b><p>去点餐，或者摇一个</p>
+        <button class="btn p sm">我要点餐</button>
+      </div>
+      <p class="hint" style="margin-top:10px">空状态是这套风格里<b>唯一允许插画出现在二级页</b>的地方——它没有信息，只有情绪。</p>
+    </div>
+    <div class="spec-box">
+      <div class="lbl">Loading · 骨架</div>
+      <div class="sk"><i style="width:66px;height:66px"></i>
+        <div style="flex:1"><i style="width:52%;height:14px"></i><i style="width:74%;height:11px;margin-top:8px"></i><i style="width:38%;height:11px;margin-top:6px"></i></div></div>
+      <div class="sk" style="margin-top:9px"><i style="width:66px;height:66px"></i>
+        <div style="flex:1"><i style="width:44%;height:14px"></i><i style="width:66%;height:11px;margin-top:8px"></i><i style="width:30%;height:11px;margin-top:6px"></i></div></div>
+      <div class="off-line" style="margin-top:12px">
+        <svg class="ic" style="width:20px;height:20px"><use href="#i-leaf"/></svg>
+        离线中 · 显示上次缓存的 128 道菜</div>
+      <p class="hint" style="margin-top:10px">PWA 弱网必给离线态。骨架用米色渐变，禁止灰色 <code>#eee</code>。</p>
+    </div>
+    <div class="spec-box">
+      <div class="lbl">Notice · 提示条</div>
+      <div class="banner info"><svg class="ic"><use href="#i-leaf"/></svg>
+        <div><b>有记忆的随机</b>已按「最近吃过」降权：红烧排骨 3 天前吃过，权重 ↓</div></div>
+      <div class="banner warn" style="margin-top:10px"><svg class="ic"><use href="#i-flame"/></svg>
+        <div><b>今天已有 2 道辣菜</b>孩子参与点餐，建议换一道清淡的</div></div>
+      <div class="banner err" style="margin-top:10px"><svg class="ic"><use href="#i-x"/></svg>
+        <div><b>保存失败</b>网络中断，草稿已留在本机，可重试</div></div>
+      <p class="hint" style="margin-top:10px">三种语义色直接复用 wash 变量。错误必须给出"数据没丢"的确定感。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 05 插画与图标 ============ -->
+<section id="s-illo">
+  <div class="sec-head">
+    <span class="n">05</span><h2>插画与图标</h2><span class="en">illustration &amp; iconography</span>
+    <p>本稿 9 张插画已按参考图风格生成，并做了<b>底色归一化</b>——每张的纸底都被校准到 <code>#F4F1E9</code>，所以贴到页面上看不到矩形边界，等于"画在纸上"。右下角水印已用相邻背景镜像修补。</p>
+  </div>
+  <div class="grid g4">
+    <div class="panel" style="padding:0;overflow:hidden"><img src="assets/hero-home.png" alt="首页主视觉" style="width:100%">
+      <div style="padding:12px 16px 16px"><div class="h3" style="font-size:13.5px">hero-home</div><p class="hint">首页主视觉 · 白菜/胡萝卜/姜蒜/面碗。760px，占首屏 46%。</p></div></div>
+    <div class="panel" style="padding:0;overflow:hidden"><img src="assets/hero-random.png" alt="随机" style="width:100%">
+      <div style="padding:12px 16px 16px"><div class="h3" style="font-size:13.5px">hero-random</div><p class="hint">随机页顶部 · 骰子+厨师帽。结果卡出现后缩小为 88px 侧图。</p></div></div>
+    <div class="panel" style="padding:0;overflow:hidden"><img src="assets/hero-empty.png" alt="空状态" style="width:100%">
+      <div style="padding:12px 16px 16px"><div class="h3" style="font-size:13.5px">hero-empty</div><p class="hint">空状态 · 空碗+筷子+一片叶子。构图刻意留白，缩到 170px 仍透气。</p></div></div>
+    <div class="panel" style="padding:0;overflow:hidden"><img src="assets/dish-breakfast.png" alt="早餐" style="width:100%">
+      <div style="padding:12px 16px 16px"><div class="h3" style="font-size:13.5px">dish-*</div><p class="hint">菜品缩略图 6 张，400px。命名规则 <code>dish-{食材+做法}</code>，对应 Supabase Storage 路径。</p></div></div>
+  </div>
+
+  <div class="grid g2" style="margin-top:16px">
+    <div class="panel">
+      <div class="h3">线描图标集<span class="en">24 × 24 · stroke 1.7</span></div>
+      <p class="hint" style="margin:6px 0 14px">统一 viewBox 24、圆头圆角、无填充。缺图标就按这三条补，不要混入面性图标。</p>
+      <div class="ico-grid" id="icogrid"></div>
+    </div>
+    <div class="panel">
+      <div class="h3">插画使用规则<span class="en">how to place</span></div>
+      <ul class="ticks">
+        <li>插画<b>不加圆角容器、不加边框、不加阴影</b>——它本身就是纸的一部分。</li>
+        <li>主视觉只出现在首页与随机页顶部；列表项内只用菜品实拍/水彩缩略图，且统一 <code>aspect-ratio:1</code> + <code>object-fit:cover</code>。</li>
+        <li>缺图时用 <code>--canvas</code> 底 + 线描图标兜底，绝不用灰色占位图。</li>
+        <li>归一化底色依赖页面底色一致：如果将来加深色模式，插画必须重新出一版深色纸底，<b>不能靠滤镜反色</b>。</li>
+        <li>体积：hero 760px ≈ 400–750KB，dish 400px ≈ 220KB。上线前转 WebP/AVIF 并交给 Supabase Storage 的 CDN。</li>
+      </ul>
+      <div class="banner info" style="margin-top:14px"><svg class="ic"><use href="#i-camera"/></svg>
+        <div><b>真实数据阶段</b>家庭自拍菜品照片 → 用 <code>background:var(--canvas)</code> 承托 + 圆角 16px，即从"水彩"切到"照片"也不违和。</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 06 动效 ============ -->
+<section id="s-motion">
+  <div class="sec-head">
+    <span class="n">06</span><h2>动效</h2><span class="en">motion</span>
+    <p>手账是"安静"的东西。动效只做两件事：确认触控反馈、让加菜/摇骰有物感。<b>全站禁止循环动画</b>（骰子外圈虚线旋转是唯一例外，且只在随机页）。</p>
+  </div>
+  <div class="grid g2">
+    <div class="panel">
+      <div class="motion-row"><div class="motion-demo m1"><div class="dot"></div></div>
+        <div class="t"><b>按压反馈 · hover 试试</b><span>--t-fast 150ms · cubic-bezier(.22,.8,.28,1)</span></div></div>
+      <div class="motion-row"><div class="motion-demo m2"><div class="dot"></div></div>
+        <div class="t"><b>加菜入篮 · 轻微回弹</b><span>--t 240ms · cubic-bezier(.34,1.4,.64,1)</span></div></div>
+      <div class="motion-row"><div class="motion-demo m3"><div class="dot"></div></div>
+        <div class="t"><b>收藏心 / 展开筛选</b><span>--t-slow 420ms · 形变类动作</span></div></div>
+      <div class="motion-row"><div class="motion-demo m4"><div class="dot"></div></div>
+        <div class="t"><b>摇骰待命 · 呼吸</b><span>2.6s 循环 · 仅随机页主按钮</span></div></div>
+    </div>
+    <div class="panel">
+      <div class="h3">动效清单<span class="en">spec</span></div>
+      <table style="margin-top:10px">
+        <tr><th>场景</th><th>属性</th><th>时长 / 缓动</th></tr>
+        <tr><td>卡片点按</td><td><code>scale .98</code></td><td>150ms / ease-out</td></tr>
+        <tr><td>加号 → 步进器</td><td><code>scale .8→1</code> + 淡入</td><td>240ms / back</td></tr>
+        <tr><td>摇骰结果出现</td><td><code>translateY 12→0</code> + 淡入</td><td>320ms / ease-out，骰子图标先 shake 620ms</td></tr>
+        <tr><td>左侧食材切换</td><td>列表 <code>fade + translateY 8</code></td><td>200ms，逐条 20ms 错峰</td></tr>
+        <tr><td>确认点餐成功</td><td>撒一次叶子/小花粒子</td><td>900ms 单次，<b>不循环</b></td></tr>
+        <tr><td>页面转场</td><td>右侧推入 + 底色不动</td><td>280ms / ease-out</td></tr>
+        <tr><td>骨架屏</td><td>米色渐变位移</td><td>1.4s 循环（加载期允许）</td></tr>
+      </table>
+      <p class="hint" style="margin-top:12px">必须支持 <code>prefers-reduced-motion</code>：命中时去掉 shake、粒子与呼吸，只保留 150ms 内的透明度变化。</p>
+    </div>
+  </div>
+</section>
+<!-- ============ 07 核心 6 页 ============ -->
+<section id="s-pages">
+  <div class="sec-head">
+    <span class="n">07</span><h2>核心 6 页高保真原型</h2><span class="en">screens · 390 × 844</span>
+    <p>覆盖 README 第一阶段全部主链路：<b>菜品 → 筛选 → 点餐 → 随机 → 历史</b>。每屏可在手机框内<b>直接滚动</b>查看被裁掉的下方内容。</p>
+  </div>
+
+  <div class="stage">
+
+    <!-- ① 首页 -->
+    <div class="unit">
+      <div class="cap"><b>① 首页</b><code>views/Home.vue</code><i>/ · 复刻参考图的非对称宫格节奏</i></div>
+      <div class="phone"><div class="screen app">
+        <div class="notch"></div>
+        <div class="scroll">
+          <div class="statusbar">9:41<div class="r"><i></i><i></i><i></i></div></div>
+          <div class="wordmark">
+            <div class="en">今天吃什么</div>
+            <div class="sub">a lazy day in the family kitchen</div>
+          </div>
+          <div style="display:flex;justify-content:center;margin-top:12px">
+            <div class="fambadge"><svg class="ic" style="width:13px;height:13px"><use href="#i-leaf"/></svg>
+              小之家 · 3 人<svg class="ic" style="width:11px;height:11px"><use href="#i-down"/></svg></div>
+          </div>
+          <img src="assets/hero-home.png" alt="厨房水彩主视觉" style="width:282px;margin:4px auto 0">
+          <div class="mosaic">
+            <div class="card big tap">
+              <div class="illu"><svg class="ic"><use href="#i-order"/></svg></div>
+              <div class="bi"><em>order</em><b>我要点餐</b></div>
+              <div class="hint" style="font-size:11px">早餐 · 正餐 · 火锅</div>
+            </div>
+            <div class="card mrow tap"><svg class="ic"><use href="#i-bowl"/></svg>
+              <div class="bi"><em>today</em><b>今日点餐</b></div>
+              <svg class="ic ar"><use href="#i-right"/></svg></div>
+            <div class="card mrow tap"><svg class="ic" style="stroke:var(--terracotta)"><use href="#i-dice"/></svg>
+              <div class="bi"><em>random</em><b>随机吃什么</b></div>
+              <svg class="ic ar"><use href="#i-right"/></svg></div>
+          </div>
+          <div class="wide tap card" style="cursor:pointer">
+            <svg class="ic" style="width:26px;height:26px"><use href="#i-clock"/></svg>
+            <div class="l"><b>我的常吃</b><em>frequently eaten</em><p>19 道菜占了本周 8 顿 · 试试很久没吃的</p></div>
+            <svg class="ic ar" style="width:16px;height:16px;stroke:var(--olive-mid)"><use href="#i-right"/></svg>
+          </div>
+          <div class="wide tap card" style="cursor:pointer">
+            <svg class="ic" style="width:26px;height:26px;stroke:var(--mauve)"><use href="#i-heart"/></svg>
+            <div class="l"><b>我的收藏</b><em>favorites</em><p>24 道 · 妈妈 12 · 爸爸 8 · 孩子 4</p></div>
+            <svg class="ic ar" style="width:16px;height:16px;stroke:var(--olive-mid)"><use href="#i-right"/></svg>
+          </div>
+          <div class="wide tap card" style="cursor:pointer">
+            <svg class="ic" style="width:26px;height:26px"><use href="#i-menu3"/></svg>
+            <div class="l"><b>菜品管理</b><em>dishes</em><p>共 128 道 · 3 道已停用 · 12 道缺图</p></div>
+            <svg class="ic ar" style="width:16px;height:16px;stroke:var(--olive-mid)"><use href="#i-right"/></svg>
+          </div>
+          <div style="padding:18px 18px 0">
+            <div class="stats">
+              <div><b>8</b><em>本周餐次</em></div><div><b>12</b><em>吃过菜数</em></div>
+              <div><b>47</b><em>最久没吃(天)</em></div>
+            </div>
+          </div>
+          <div style="text-align:center;font-family:var(--f-hand);font-size:16px;color:var(--olive-mid);padding:20px 0 6px">
+            eat well, together</div>
+        </div>
+        <div class="tabbar">
+          <a class="on"><svg class="ic"><use href="#i-home"/></svg><span>首页</span></a>
+          <a><svg class="ic"><use href="#i-order"/></svg><span>点餐</span></a>
+          <a class="dice"><div class="d"><svg class="ic"><use href="#i-dice"/></svg></div><span>随机</span></a>
+          <a><svg class="ic"><use href="#i-book"/></svg><span>常吃</span></a>
+          <a><svg class="ic"><use href="#i-user"/></svg><span>我的</span></a>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ② 我要点餐 -->
+    <div class="unit">
+      <div class="cap"><b>② 我要点餐</b><code>views/Order.vue</code><i>/order · 食材 × 做法 二维筛选</i></div>
+      <div class="phone"><div class="screen app">
+        <div class="notch"></div>
+        <div class="scroll">
+          <div class="statusbar">9:41<div class="r"><i></i><i></i><i></i></div></div>
+          <div class="navbar">
+            <div class="back"><svg class="ic"><use href="#i-left"/></svg></div>
+            <div class="t"><b>我要点餐</b><em>order your meal</em></div>
+            <div class="act"><div class="iconbtn"><svg class="ic"><use href="#i-search"/></svg></div></div>
+          </div>
+          <div style="margin:0 18px 12px"><div class="seg"><i>早餐</i><i class="on">正餐</i></div></div>
+          <div class="pad"><div class="chips">
+            <div class="chip on">荤菜</div><div class="chip">素菜</div><div class="chip">火锅</div><div class="chip">其他</div>
+          </div></div>
+
+          <div class="sec-t" style="margin:20px 18px 0"><b style="font-size:13.5px">二维筛选</b><em>ingredient × method</em>
+            <span class="more">左选食材 · 上选做法</span></div>
+          <div class="twocol" style="margin-top:10px">
+            <div class="side">
+              <button>猪肉<span class="c">18</span></button>
+              <button>牛肉<span class="c">12</span></button>
+              <button class="on">鸡肉<span class="c">24</span></button>
+              <button>鸭肉<span class="c">6</span></button>
+              <button>羊肉<span class="c">8</span></button>
+              <button>鱼<span class="c">14</span></button>
+              <button>虾<span class="c">9</span></button>
+              <button>螃蟹<span class="c">4</span></button>
+              <button>鸡蛋<span class="c">11</span></button>
+              <button>豆腐<span class="c">7</span></button>
+              <button>菌菇<span class="c">10</span></button>
+            </div>
+            <div class="maincol">
+              <div style="font-size:9.5px;letter-spacing:.1em;color:var(--ink-3);font-weight:700;margin-bottom:7px">METHOD · 做法</div>
+              <div class="chips nowrap">
+                <div class="chip warm on">炒</div><div class="chip">红烧</div><div class="chip">炖</div>
+                <div class="chip">蒸</div><div class="chip">煮</div><div class="chip">炸</div>
+                <div class="chip">煎</div><div class="chip">烤</div><div class="chip">焖</div>
+                <div class="chip">卤</div><div class="chip">糖醋</div><div class="chip">凉拌</div>
+              </div>
+              <div class="hint" style="margin:10px 0 8px;font-size:11.5px">鸡肉 + 炒 · 4 道</div>
+
+              <div class="dish"><div class="thw"><img src="assets/dish-kungpao.png" alt="宫保鸡丁"></div>
+                <div class="b"><div class="nm"><b>宫保鸡丁</b>
+                  <svg class="ic" style="width:15px;height:15px;fill:var(--mauve);stroke:none"><use href="#i-heart"/></svg></div>
+                  <div class="meta">20 min · 19 次 · 3 天前</div>
+                  <div class="tags"><span class="tag hot">辣</span><span class="tag">下饭</span><span class="tag freq">常吃</span></div></div>
+                <div class="rt"><div class="add"><svg class="ic"><use href="#i-plus"/></svg></div></div></div>
+
+              <div class="dish"><div class="thw"><img src="assets/dish-laziji.png" alt="辣子鸡"></div>
+                <div class="b"><div class="nm"><b>辣子鸡</b></div>
+                  <div class="meta">25 min · 6 次 · 41 天前</div>
+                  <div class="tags"><span class="tag hot">爆辣</span><span class="tag">下饭</span></div></div>
+                <div class="rt"><div class="add"><svg class="ic"><use href="#i-plus"/></svg></div></div></div>
+
+              <div class="dish"><div class="thw"><img src="assets/dish-pepperchicken.png" alt="青椒炒鸡"></div>
+                <div class="b"><div class="nm"><b>青椒炒鸡</b>
+                  <svg class="ic" style="width:15px;height:15px;fill:var(--mauve);stroke:none"><use href="#i-heart"/></svg></div>
+                  <div class="meta">15 min · 11 次</div>
+                  <div class="tags"><span class="tag">不辣</span><span class="tag fam">适合儿童</span></div></div>
+                <div class="rt"><div class="stepper"><button><svg class="ic"><use href="#i-minus"/></svg></button><span>1</span><button><svg class="ic"><use href="#i-plus"/></svg></button></div></div></div>
+
+              <div class="dish"><div class="thw"><img src="assets/dish-chickenstir.png" alt="小炒鸡"></div>
+                <div class="b"><div class="nm"><b>木耳小炒鸡</b></div>
+                  <div class="meta">18 min · 2 次 · 很久没吃</div>
+                  <div class="tags"><span class="tag">家常</span><span class="tag off">距上次 63 天</span></div></div>
+                <div class="rt"><div class="add"><svg class="ic"><use href="#i-plus"/></svg></div></div></div>
+
+              <div class="banner info" style="margin-top:12px"><svg class="ic"><use href="#i-leaf"/></svg>
+                <div><b>孩子 3 天前点过辣子鸡</b>偏好标记为「不喜欢」，已自动降权</div></div>
+
+              <div class="sec-t" style="margin:20px 0 9px;padding:0"><b style="font-size:13.5px">同食材其他做法</b><em>more</em></div>
+              <div class="dish"><div class="thw"><img src="assets/dish-ribs.png" alt="红烧排骨"></div>
+                <div class="b"><div class="nm"><b>红烧排骨</b></div><div class="meta">猪肉 + 红烧 · 45 min</div>
+                  <div class="tags"><span class="tag freq">常吃</span><span class="tag">下饭</span></div></div>
+                <div class="rt"><div class="add"><svg class="ic"><use href="#i-plus"/></svg></div></div></div>
+              <div class="dish"><div class="thw"><img src="assets/dish-tomatoegg.png" alt="西红柿炒鸡蛋"></div>
+                <div class="b"><div class="nm"><b>西红柿炒鸡蛋</b></div><div class="meta">素菜 · 鸡蛋 + 炒 · 10 min</div>
+                  <div class="tags"><span class="tag">酸甜</span><span class="tag fam">适合儿童</span></div></div>
+                <div class="rt"><div class="add"><svg class="ic"><use href="#i-plus"/></svg></div></div></div>
+              <div style="height:8px"></div>
+            </div>
+          </div>
+        </div>
+        <div class="dock">
+          <div class="sum"><b>已选 2 道</b><em>青椒炒鸡 ×1 · 米饭 ×1</em></div>
+          <button class="btn w">去今日点餐</button>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ③ 随机点餐 -->
+    <div class="unit">
+      <div class="cap"><b>③ 随机点餐</b><code>views/Random.vue</code><i>/random · 有记忆的随机</i></div>
+      <div class="phone"><div class="screen app">
+        <div class="notch"></div>
+        <div class="scroll">
+          <div class="statusbar">9:41<div class="r"><i></i><i></i><i></i></div></div>
+          <div class="navbar">
+            <div class="back"><svg class="ic"><use href="#i-left"/></svg></div>
+            <div class="t"><b>随机吃什么</b><em>roll the dice</em></div>
+            <div class="act"><div class="iconbtn"><svg class="ic"><use href="#i-filter"/></svg></div></div>
+          </div>
+          <img src="assets/hero-random.png" alt="" style="width:230px;margin:-2px auto 6px">
+          <div style="margin:0 18px 14px"><div class="seg warm"><i>随机一道</i><i class="on">随机配菜</i><i>随机一桌</i></div></div>
+
+          <div class="pad"><div class="card" style="padding:14px 16px">
+            <div style="display:grid;gap:11px">
+              <div style="display:flex;align-items:center;gap:9px">
+                <span style="font-size:11px;color:var(--ink-3);width:34px;flex:0 0 auto">餐型</span>
+                <div class="chips"><div class="chip on">晚餐</div><div class="chip">午餐</div><div class="chip">不限</div></div></div>
+              <div style="display:flex;align-items:center;gap:9px">
+                <span style="font-size:11px;color:var(--ink-3);width:34px;flex:0 0 auto">类别</span>
+                <div class="chips"><div class="chip on">荤菜</div><div class="chip">素菜</div><div class="chip">汤</div></div></div>
+              <div style="display:flex;align-items:center;gap:9px">
+                <span style="font-size:11px;color:var(--ink-3);width:34px;flex:0 0 auto">口味</span>
+                <div class="chips"><div class="chip on">微辣</div><div class="chip">清淡</div><div class="chip">酸甜</div></div></div>
+            </div>
+            <div class="banner info" style="margin-top:13px;padding:10px 12px"><svg class="ic"><use href="#i-clock"/></svg>
+              <div style="font-size:12px"><b>已排除 7 天内的菜</b>红烧排骨（3 天前）、米饭（昨天）不参与本次随机</div></div>
+          </div></div>
+
+          <div class="dice-btn">
+            <div style="display:grid;justify-items:center">
+              <svg class="ic" style="stroke:#fff"><use href="#i-dice"/></svg>
+              <b>摇一摇</b>
+            </div>
+          </div>
+          <div style="text-align:center;font-size:11.5px;color:var(--ink-3);margin:10px 0 16px">
+            候选 38 道 · 权重按 5 项历史数据计算</div>
+
+          <div class="pad"><div class="result">
+            <div style="display:flex;gap:13px;align-items:center">
+              <div class="thw" style="width:74px;height:74px"><img src="assets/dish-pepperchicken.png" alt="青椒炒鸡"></div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:19px;font-weight:800;letter-spacing:-.3px">青椒炒鸡</div>
+                <div style="font-size:11.5px;color:var(--ink-3);margin-top:2px">鸡肉 + 炒 · 15 min · 快手菜</div>
+                <div class="tags" style="margin-top:7px"><span class="tag">不辣</span><span class="tag fam">适合儿童</span><span class="tag">快手</span></div>
+              </div>
+            </div>
+            <div class="why">
+              <div><svg class="ic"><use href="#i-clock"/></svg><b style="width:70px;flex:0 0 auto;font-size:11.5px;color:var(--ink);font-weight:700">很久没吃</b>
+                <span class="bar y"><i style="width:82%"></i></span><span style="font-size:11px">63 天 ↑</span></div>
+              <div><svg class="ic"><use href="#i-user"/></svg><b style="width:70px;flex:0 0 auto;font-size:11.5px;color:var(--ink);font-weight:700">全家偏好</b>
+                <span class="bar m"><i style="width:74%"></i></span><span style="font-size:11px">3 人都行</span></div>
+              <div><svg class="ic"><use href="#i-leaf"/></svg><b style="width:70px;flex:0 0 auto;font-size:11.5px;color:var(--ink);font-weight:700">荤素平衡</b>
+                <span class="bar"><i style="width:58%"></i></span><span style="font-size:11px">本周少荤</span></div>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:15px">
+              <button class="btn o" style="flex:1"><svg class="ic" style="stroke:var(--olive-deep)"><use href="#i-swap"/></svg>换一个</button>
+              <button class="btn w" style="flex:1.2"><svg class="ic" style="stroke:#fff"><use href="#i-check"/></svg>就吃它</button>
+            </div>
+          </div>
+
+          <div class="sec-t" style="margin:22px 0 10px;padding:0"><b style="font-size:13.5px">随机一桌 · 2~3 人</b><em>a full table</em></div>
+          <div class="card" style="padding:14px 16px">
+            <div style="display:grid;gap:10px">
+              <div style="display:flex;align-items:center;gap:10px"><span class="tag" style="width:38px;text-align:center">荤</span>
+                <div class="thw" style="width:38px;height:38px;border-radius:10px"><img src="assets/dish-pepperchicken.png"></div>
+                <b style="font-size:13.5px">青椒炒鸡</b><span style="margin-left:auto;font-size:11px;color:var(--ink-3)">15 min</span></div>
+              <div style="display:flex;align-items:center;gap:10px"><span class="tag" style="width:38px;text-align:center">素</span>
+                <div class="thw" style="width:38px;height:38px;border-radius:10px"><img src="assets/dish-greens.png"></div>
+                <b style="font-size:13.5px">清炒小白菜</b><span style="margin-left:auto;font-size:11px;color:var(--ink-3)">8 min</span></div>
+              <div style="display:flex;align-items:center;gap:10px"><span class="tag" style="width:38px;text-align:center">汤</span>
+                <div class="thw" style="width:38px;height:38px;border-radius:10px"><img src="assets/dish-soup.png"></div>
+                <b style="font-size:13.5px">紫菜蛋花汤</b><span style="margin-left:auto;font-size:11px;color:var(--ink-3)">12 min</span></div>
+              <div style="display:flex;align-items:center;gap:10px"><span class="tag" style="width:38px;text-align:center">主食</span>
+                <div class="thw" style="width:38px;height:38px;border-radius:10px;--z:1.6"><img src="assets/dish-rice.png"></div>
+                <b style="font-size:13.5px">米饭</b><span style="margin-left:auto;font-size:11px;color:var(--ink-3)">电饭煲</span></div>
+            </div>
+            <div class="hint" style="margin-top:12px;padding-top:11px;border-top:1px dashed var(--line)">
+              总耗时 <b>35 min</b>（并行计算）· 其中 2 道是 3 人共同偏好</div>
+          </div></div>
+          <div style="height:10px"></div>
+        </div>
+        <div class="tabbar">
+          <a><svg class="ic"><use href="#i-home"/></svg><span>首页</span></a>
+          <a><svg class="ic"><use href="#i-order"/></svg><span>点餐</span></a>
+          <a class="dice on"><div class="d"><svg class="ic"><use href="#i-dice"/></svg></div><span>随机</span></a>
+          <a><svg class="ic"><use href="#i-book"/></svg><span>常吃</span></a>
+          <a><svg class="ic"><use href="#i-user"/></svg><span>我的</span></a>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ④ 今日点餐 -->
+    <div class="unit">
+      <div class="cap"><b>④ 今日点餐</b><code>views/TodayOrder.vue</code><i>/today · meal_orders 草稿态</i></div>
+      <div class="phone"><div class="screen app">
+        <div class="notch"></div>
+        <div class="scroll">
+          <div class="statusbar">9:41<div class="r"><i></i><i></i><i></i></div></div>
+          <div class="navbar">
+            <div class="back"><svg class="ic"><use href="#i-left"/></svg></div>
+            <div class="t"><b>今日点餐</b><em>today's menu</em></div>
+            <div class="act"><div class="iconbtn"><svg class="ic"><use href="#i-book"/></svg></div></div>
+          </div>
+          <div class="datebar">
+            <div class="d"><b>10 月 2 日</b><em>friday · 今天</em></div>
+            <div class="nav2"><i><svg class="ic"><use href="#i-left"/></svg></i><i><svg class="ic"><use href="#i-right"/></svg></i></div>
+          </div>
+          <div style="margin:0 18px 14px"><div class="seg"><i>早餐</i><i>午餐</i><i class="on">晚餐</i></div></div>
+
+          <div class="pad"><div class="card" style="padding:13px 15px">
+            <div style="display:flex;align-items:center;gap:11px">
+              <div class="avstack"><div class="av">爸</div><div class="av m">妈</div><div class="av t">娃</div></div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:700">3 人 · 已达成一致</div>
+                <div style="font-size:11px;color:var(--ink-3);margin-top:1px">孩子对「辣子鸡」投了不喜欢</div>
+              </div>
+              <button class="btn xs o">发起投票</button>
+            </div>
+          </div></div>
+
+          <div class="grp"><b>荤菜</b><em>MEAT ×1</em><span class="dash"></span><button class="btn xs g">+ 加</button></div>
+          <div class="pad"><div class="dish" style="margin:0"><div class="thw"><img src="assets/dish-pepperchicken.png"></div>
+            <div class="b"><div class="nm"><b>青椒炒鸡</b></div><div class="meta">鸡肉 + 炒 · 15 min · 常吃了 11 次</div>
+              <div class="tags"><span class="tag fam">孩子喜欢</span><span class="tag">快手</span></div></div>
+            <div class="rt"><div class="stepper"><button><svg class="ic"><use href="#i-minus"/></svg></button><span>1</span><button><svg class="ic"><use href="#i-plus"/></svg></button></div></div></div></div>
+
+          <div class="grp"><b>素菜</b><em>VEG ×1</em><span class="dash"></span><button class="btn xs g">+ 加</button></div>
+          <div class="pad"><div class="dish" style="margin:0"><div class="thw"><img src="assets/dish-greens.png"></div>
+            <div class="b"><div class="nm"><b>清炒小白菜</b></div><div class="meta">蔬菜 + 炒 · 8 min · 距上次 9 天</div>
+              <div class="tags"><span class="tag">清淡</span></div></div>
+            <div class="rt"><div class="stepper"><button><svg class="ic"><use href="#i-minus"/></svg></button><span>1</span><button><svg class="ic"><use href="#i-plus"/></svg></button></div></div></div></div>
+
+          <div class="grp"><b>汤</b><em>SOUP ×1</em><span class="dash"></span><button class="btn xs g">+ 加</button></div>
+          <div class="pad"><div class="dish" style="margin:0"><div class="thw"><img src="assets/dish-soup.png"></div>
+            <div class="b"><div class="nm"><b>紫菜蛋花汤</b></div><div class="meta">其他 · 12 min · 距上次 47 天</div>
+              <div class="tags"><span class="tag">清淡</span><span class="tag off">很久没吃</span></div></div>
+            <div class="rt"><div class="stepper"><button><svg class="ic"><use href="#i-minus"/></svg></button><span>1</span><button><svg class="ic"><use href="#i-plus"/></svg></button></div></div></div></div>
+
+          <div class="grp"><b>主食</b><em>STAPLE ×1</em><span class="dash"></span><button class="btn xs g">+ 加</button></div>
+          <div class="pad"><div class="dish" style="margin:0"><div class="thw" style="--z:1.6"><img src="assets/dish-rice.png"></div>
+            <div class="b"><div class="nm"><b>米饭</b></div><div class="meta">昨天刚吃过 · 3 人份</div>
+              <div class="tags"><span class="tag freq">常吃</span></div></div>
+            <div class="rt"><div class="stepper"><button><svg class="ic"><use href="#i-minus"/></svg></button><span>3</span><button><svg class="ic"><use href="#i-plus"/></svg></button></div></div></div></div>
+
+          <div class="pad" style="margin-top:18px">
+            <div class="banner warn"><svg class="ic"><use href="#i-flame"/></svg>
+              <div><b>今天午餐也吃了炒鸡</b>同食材重复，要不要换一道鱼或豆制品？</div></div>
+            <div class="stats" style="margin-top:14px">
+              <div><b>4</b><em>菜品数</em></div><div><b>35</b><em>预计分钟</em></div><div><b>1</b><em>需要买菜</em></div>
+            </div>
+            <div style="text-align:center;font-family:var(--f-hand);font-size:16px;color:var(--olive-mid);padding:16px 0 4px">
+              dinner for three</div>
+          </div>
+        </div>
+        <div class="dock">
+          <div class="sum"><b>草稿 · 未确认</b><em>确认后写入历史 · eat_count +1</em></div>
+          <div class="iconbtn" style="width:42px;height:42px;flex:0 0 auto"><svg class="ic" style="width:20px;height:20px"><use href="#i-dice"/></svg></div>
+          <button class="btn p">确认点餐</button>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ⑤ 菜品管理 -->
+    <div class="unit">
+      <div class="cap"><b>⑤ 菜品管理</b><code>views/DishManage.vue</code><i>/dishes · 增删改停用收藏</i></div>
+      <div class="phone"><div class="screen app">
+        <div class="notch"></div>
+        <div class="scroll">
+          <div class="statusbar">9:41<div class="r"><i></i><i></i><i></i></div></div>
+          <div class="navbar">
+            <div class="back"><svg class="ic"><use href="#i-left"/></svg></div>
+            <div class="t"><b>菜品管理</b><em>manage dishes</em></div>
+            <div class="act"><div class="iconbtn"><svg class="ic"><use href="#i-grid"/></svg></div></div>
+          </div>
+          <div class="pad"><div class="search"><svg class="ic"><use href="#i-search"/></svg>
+            <span>搜菜名、食材、做法</span><div class="fil"><svg class="ic"><use href="#i-filter"/></svg></div></div></div>
+          <div class="pad" style="margin-top:11px"><div class="chips nowrap">
+            <div class="chip on">全部 128</div><div class="chip">缺图 12</div><div class="chip">停用 3</div>
+            <div class="chip">荤菜 62</div><div class="chip">素菜 38</div><div class="chip">火锅 18</div><div class="chip">早餐 10</div>
+          </div></div>
+          <div class="pad" style="margin-top:14px"><div class="stats">
+            <div><b>128</b><em>启用菜品</em></div><div><b>3</b><em>已停用</em></div><div><b>12</b><em>缺图片</em></div><div><b>6</b><em>本月新增</em></div>
+          </div></div>
+
+          <div class="sec-t"><b style="font-size:13.5px">最近添加</b><em>recent</em><span class="more">按时间</span></div>
+          <div class="pad">
+            <div class="row"><div class="thw" style="width:46px;height:46px;border-radius:11px"><img src="assets/dish-chickenstir.png"></div>
+              <div class="b"><b>木耳小炒鸡</b><em>正餐 · 荤菜 · 鸡肉 + 炒 · 标签 3</em></div>
+              <div class="ops"><i><svg class="ic"><use href="#i-edit"/></svg></i><i><svg class="ic del"><use href="#i-trash"/></svg></i><div class="sw2"></div></div></div>
+            <div class="row"><div class="thw" style="width:46px;height:46px;border-radius:11px;--z:1.6"><img src="assets/dish-rice.png"></div>
+              <div class="b"><b>米饭</b><em>正餐 · 主食 · 无做法 · 吃过 41 次</em></div>
+              <div class="ops"><i><svg class="ic"><use href="#i-edit"/></svg></i><i><svg class="ic del"><use href="#i-trash"/></svg></i><div class="sw2"></div></div></div>
+            <div class="row"><div class="thw" style="width:46px;height:46px;border-radius:11px"><img src="assets/dish-tomatoegg.png"></div>
+              <div class="b"><b>西红柿炒鸡蛋</b><em>正餐 · 素菜 · 鸡蛋 + 炒 · 分类≠食材</em></div>
+              <div class="ops"><i><svg class="ic"><use href="#i-edit"/></svg></i><i><svg class="ic del"><use href="#i-trash"/></svg></i><div class="sw2"></div></div></div>
+            <div class="row"><div class="thw" style="width:46px;height:46px;border-radius:11px;background:var(--surface-2);display:grid;place-items:center">
+                <svg class="ic" style="width:18px;height:18px;stroke:var(--olive-mid)"><use href="#i-camera"/></svg></div>
+              <div class="b"><b>手工面</b><em>早餐 · 面食 · 缺图片 — 点虚线框补图</em></div>
+              <div class="ops"><i><svg class="ic"><use href="#i-edit"/></svg></i><i><svg class="ic del"><use href="#i-trash"/></svg></i><div class="sw2"></div></div></div>
+            <div class="row" style="opacity:.55"><div class="thw" style="width:46px;height:46px;border-radius:11px"><img src="assets/dish-hotpot.png"></div>
+              <div class="b"><b>番茄牛腩锅</b><em>正餐 · 火锅 · 牛肉 + 焖 · 已停用</em></div>
+              <div class="ops"><i><svg class="ic"><use href="#i-edit"/></svg></i><i><svg class="ic del"><use href="#i-trash"/></svg></i><div class="sw2 off"></div></div></div>
+            <div class="row"><div class="thw" style="width:46px;height:46px;border-radius:11px"><img src="assets/dish-breakfast.png"></div>
+              <div class="b"><b>豆浆油条套餐</b><em>早餐 · 主食+饮品 · 不套荤素分类</em></div>
+              <div class="ops"><i><svg class="ic"><use href="#i-edit"/></svg></i><i><svg class="ic del"><use href="#i-trash"/></svg></i><div class="sw2"></div></div></div>
+          </div>
+
+          <div class="pad" style="margin-top:16px">
+            <div class="banner err"><svg class="ic"><use href="#i-trash"/></svg>
+              <div><b>删除是二次确认的</b>家庭菜单是长期积累的数据，默认走「停用」而不是删除</div></div>
+            <div class="hint" style="margin-top:12px;line-height:1.8">
+              <b>字段全部来自数据库</b>（README 33.2）：分类、食材、做法、标签都是可增删的选项，不在前端写死。<br>
+              <b>分类 ≠ 食材</b>：西红柿炒鸡蛋归"素菜"，食材仍记"鸡蛋"。</div>
+          </div>
+          <div style="height:20px"></div>
+        </div>
+        <div class="fab"><svg class="ic"><use href="#i-plus"/></svg></div>
+        <div class="tabbar">
+          <a><svg class="ic"><use href="#i-home"/></svg><span>首页</span></a>
+          <a><svg class="ic"><use href="#i-order"/></svg><span>点餐</span></a>
+          <a class="dice"><div class="d"><svg class="ic"><use href="#i-dice"/></svg></div><span>随机</span></a>
+          <a><svg class="ic"><use href="#i-book"/></svg><span>常吃</span></a>
+          <a class="on"><svg class="ic"><use href="#i-user"/></svg><span>我的</span></a>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ⑤b 新增菜品浮层 -->
+    <div class="unit">
+      <div class="cap"><b>⑤b 新增菜品</b><code>DishForm (sheet)</code><i>底部浮层 · 少输入原则</i></div>
+      <div class="phone"><div class="screen app">
+        <div class="notch"></div>
+        <div class="scroll" style="filter:saturate(.9)">
+          <div class="statusbar">9:41<div class="r"><i></i><i></i><i></i></div></div>
+          <div class="navbar"><div class="back"><svg class="ic"><use href="#i-left"/></svg></div>
+            <div class="t"><b>菜品管理</b><em>manage dishes</em></div></div>
+          <div class="pad"><div class="search"><svg class="ic"><use href="#i-search"/></svg><span>搜菜名、食材、做法</span></div></div>
+          <div class="pad" style="margin-top:12px">
+            <div class="row"><div class="thw" style="width:46px;height:46px;border-radius:11px"><img src="assets/dish-kungpao.png"></div>
+              <div class="b"><b>宫保鸡丁</b><em>正餐 · 荤菜 · 鸡肉 + 炒</em></div><div class="ops"><div class="sw2"></div></div></div>
+            <div class="row"><div class="thw" style="width:46px;height:46px;border-radius:11px"><img src="assets/dish-greens.png"></div>
+              <div class="b"><b>清炒小白菜</b><em>正餐 · 素菜 · 蔬菜 + 炒</em></div><div class="ops"><div class="sw2"></div></div></div>
+          </div>
+        </div>
+        <div class="sheet">
+          <div class="mask"></div>
+          <div class="pan">
+            <div class="grab"></div>
+            <div class="hd"><b>新增菜品</b><em>add a dish</em>
+              <div class="x"><svg class="ic"><use href="#i-x"/></svg></div></div>
+            <div class="field"><label>菜名 <i>*</i><em>dishes.name</em></label>
+              <input class="inp" value="蒜蓉西兰花"></div>
+            <div style="display:flex;gap:11px">
+              <div class="field" style="flex:1"><label>餐型<em>meal_type</em></label>
+                <div class="sel"><input class="inp" value="正餐"></div></div>
+              <div class="field" style="flex:1"><label>分类<em>category</em></label>
+                <div class="sel"><input class="inp" value="素菜"></div></div>
+            </div>
+            <div style="display:flex;gap:11px">
+              <div class="field" style="flex:1"><label>主食材<em>ingredient_id</em></label>
+                <div class="sel"><input class="inp" value="西兰花"></div></div>
+              <div class="field" style="flex:1"><label>做法<em>cooking_method_id</em></label>
+                <div class="sel"><input class="inp" value="炒"></div></div>
+            </div>
+            <div class="field"><label>标签<em>tags · 多对多，可自造</em></label>
+              <div class="chips"><div class="chip on">清淡</div><div class="chip on">快手</div>
+                <div class="chip">下饭</div><div class="chip">适合儿童</div><div class="chip">低脂</div>
+                <div class="chip" style="box-shadow:inset 0 0 0 1.5px var(--olive-mid)">+ 新标签</div></div></div>
+            <div style="display:flex;gap:14px;align-items:center;margin-bottom:16px">
+              <div style="flex:1"><div class="field" style="margin:0 0 5px"><label>辣度</label>
+                <span class="spicy"><i class="on"></i><i></i><i></i><i></i><i></i></span></div></div>
+              <div style="flex:1"><div class="field" style="margin:0 0 5px"><label>难度</label>
+                <span class="spicy"><i class="on" style="background:var(--olive)"></i><i class="on" style="background:var(--olive)"></i><i style="background:var(--olive)"></i></span></div></div>
+              <div style="flex:1"><div class="field" style="margin:0 0 5px"><label>制作时间</label>
+                <div style="display:flex;align-items:center;gap:5px;font-family:'Cascadia Code',Consolas,monospace;font-size:14px;font-weight:700;color:var(--olive-deep)">
+                  10<span style="font-size:11px;color:var(--ink-3)">min</span></div></div></div>
+            </div>
+            <div class="field"><label>图片<em>image_url · Supabase Storage</em></label>
+              <div class="upl"><img src="assets/dish-greens.png" alt="">
+                <div class="box"><svg class="ic"><use href="#i-camera"/></svg>拍照</div>
+                <div class="box"><svg class="ic"><use href="#i-plus"/></svg>相册</div></div></div>
+            <div style="display:flex;gap:11px;margin-top:6px">
+              <button class="btn o" style="flex:1">存为草稿</button>
+              <button class="btn p" style="flex:1.4"><svg class="ic" style="stroke:#fff"><use href="#i-check"/></svg>保存菜品</button>
+            </div>
+            <p class="hint" style="margin-top:12px;text-align:center">必填只有菜名，其余全部可跳过 —— 先记下来比记完整更重要</p>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ⑥ 收藏与常吃 -->
+    <div class="unit">
+      <div class="cap"><b>⑥ 收藏 / 常吃</b><code>views/Favorites.vue</code><i>/favorites · is_favorite + eat_count</i></div>
+      <div class="phone"><div class="screen app">
+        <div class="notch"></div>
+        <div class="scroll">
+          <div class="statusbar">9:41<div class="r"><i></i><i></i><i></i></div></div>
+          <div class="navbar"><div class="back"><svg class="ic"><use href="#i-left"/></svg></div>
+            <div class="t"><b>我的收藏</b><em>favorites &amp; habits</em></div>
+            <div class="act"><div class="iconbtn on"><svg class="ic"><use href="#i-grid"/></svg></div></div>
+          </div>
+          <div style="margin:0 18px 12px"><div class="seg"><i class="on">收藏 24</i><i>常吃 19</i></div></div>
+          <div class="pad"><div class="chips nowrap">
+            <div class="chip on">全部</div><div class="chip">爸爸 8</div><div class="chip">妈妈 12</div>
+            <div class="chip">孩子 4</div><div class="chip">全家都爱 6</div>
+          </div></div>
+          <div class="pad" style="margin-top:16px"><div class="net">
+            <div class="c"><div class="thg"><img src="assets/dish-kungpao.png" alt="宫保鸡丁"></div>
+              <span class="badge">19 次</span><div class="n">宫保鸡丁</div><div class="s">鸡肉+炒 · 3 天前</div></div>
+            <div class="c"><div class="thg"><img src="assets/dish-ribs.png" alt="红烧排骨"></div>
+              <span class="badge">16 次</span><div class="n">红烧排骨</div><div class="s">猪肉+红烧 · 3 天前</div></div>
+            <div class="c"><div class="thg"><img src="assets/dish-pepperchicken.png" alt="青椒炒鸡"></div>
+              <span class="badge m">收藏</span><div class="n">青椒炒鸡</div><div class="s">11 次 · 孩子喜欢</div></div>
+            <div class="c"><div class="thg"><img src="assets/dish-tomatoegg.png" alt="西红柿炒鸡蛋"></div>
+              <span class="badge">14 次</span><div class="n">西红柿炒鸡蛋</div><div class="s">鸡蛋+炒 · 6 天前</div></div>
+            <div class="c"><div class="thg"><img src="assets/dish-greens.png" alt="清炒小白菜"></div>
+              <span class="badge m">收藏</span><div class="n">清炒小白菜</div><div class="s">9 次 · 清淡</div></div>
+            <div class="c"><div class="thg"><img src="assets/dish-soup.png" alt="紫菜蛋花汤"></div>
+              <span class="badge">7 次</span><div class="n">紫菜蛋花汤</div><div class="s">47 天没吃了</div></div>
+          </div></div>
+
+          <div class="sec-t" style="margin:24px 0 10px"><b style="font-size:13.5px">常吃榜</b><em>most eaten</em><span class="more">按次数</span></div>
+          <div class="pad"><div class="card" style="padding:14px 16px;display:grid;gap:11px">
+            <div style="display:flex;align-items:center;gap:10px"><b style="font-size:12px;width:14px;color:var(--ink-3)">1</b>
+              <span style="font-size:13px;font-weight:700;flex:0 0 84px">宫保鸡丁</span>
+              <span class="bar y"><i style="width:92%"></i></span><span style="font-size:11px;color:var(--ink-3)">19</span></div>
+            <div style="display:flex;align-items:center;gap:10px"><b style="font-size:12px;width:14px;color:var(--ink-3)">2</b>
+              <span style="font-size:13px;font-weight:700;flex:0 0 84px">红烧排骨</span>
+              <span class="bar y"><i style="width:78%"></i></span><span style="font-size:11px;color:var(--ink-3)">16</span></div>
+            <div style="display:flex;align-items:center;gap:10px"><b style="font-size:12px;width:14px;color:var(--ink-3)">3</b>
+              <span style="font-size:13px;font-weight:700;flex:0 0 84px">西红柿炒鸡蛋</span>
+              <span class="bar y"><i style="width:68%"></i></span><span style="font-size:11px;color:var(--ink-3)">14</span></div>
+            <div style="display:flex;align-items:center;gap:10px"><b style="font-size:12px;width:14px;color:var(--olive)">↑</b>
+              <span style="font-size:13px;font-weight:700;flex:0 0 84px;color:var(--olive-deep)">木耳小炒鸡</span>
+              <span class="bar t"><i style="width:14%"></i></span><span style="font-size:11px;color:var(--ink-3)">2</span></div>
+            <p class="hint" style="padding-top:3px">末行是<b>低频但很久没吃</b>的菜 —— 随机算法会主动把它往上抬。</p>
+          </div></div>
+
+          <div class="pad" style="margin-top:18px">
+            <div class="empty" style="padding:6px 8px 0"><img src="assets/hero-empty.png" alt="" style="width:132px">
+              <b>「火锅」还没有收藏</b><p>冬天快到了，先去点餐页挑几道涮菜</p>
+              <button class="btn p sm">去点餐页看看</button></div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <a><svg class="ic"><use href="#i-home"/></svg><span>首页</span></a>
+          <a><svg class="ic"><use href="#i-order"/></svg><span>点餐</span></a>
+          <a class="dice"><div class="d"><svg class="ic"><use href="#i-dice"/></svg></div><span>随机</span></a>
+          <a class="on"><svg class="ic"><use href="#i-book"/></svg><span>常吃</span></a>
+          <a><svg class="ic"><use href="#i-user"/></svg><span>我的</span></a>
+        </div>
+      </div></div>
+    </div>
+
+  </div>
+</section>
+<!-- ============ 08 响应式 ============ -->
+<section id="s-resp">
+  <div class="sec-head">
+    <span class="n">08</span><h2>响应式与多端</h2><span class="en">responsive</span>
+    <p>呼应 README 第 4 节：<b>业务逻辑一套，只换布局</b>。手机是单列 + 左侧食材栏；平板变双列菜品网格；PC 变"导航 / 筛选 / 详情+今日点餐"三栏，且把随机结果常驻右栏而不是弹层。</p>
+  </div>
+  <style>
+  .pcard{background:var(--surface);border-radius:var(--r-lg);padding:9px;box-shadow:var(--sh-card);min-width:0}
+  .pcard .row2{min-width:0}
+  .pcard .row2 .tag{flex:0 0 auto}
+  .pcard .pic{aspect-ratio:4/3;border-radius:12px;overflow:hidden;background:var(--canvas)}
+  .pcard .pic img{width:100%;height:100%;object-fit:cover;transform:scale(1.22)}
+  .pcard b{display:block;font-size:13.5px;font-weight:800;margin-top:8px}
+  .pcard .row2{display:flex;align-items:center;gap:6px;margin-top:6px}
+  .pnav{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:12px;
+    font-size:13px;font-weight:600;color:var(--ink-2)}
+  .pnav.on{background:var(--olive-wash);color:var(--olive-deep);font-weight:800}
+  .pnav svg{width:17px;height:17px;stroke:currentColor}
+  .pnav .c{margin-left:auto;font-size:10.5px;color:var(--ink-3);font-family:'Cascadia Code',Consolas,monospace}
+  </style>
+  <div class="desk">
+    <div class="bar"><i></i><i></i><i></i><span>家庭点餐系统 · 1440 × 900 · ≥ 1280px 三栏布局</span></div>
+    <div style="display:flex;gap:16px;padding:18px;background:var(--canvas)">
+      <aside style="width:184px;flex:0 0 auto">
+        <div style="font-family:var(--f-hand);font-size:22px;color:var(--olive);line-height:1.1;padding:2px 0 0 4px">今天吃什么</div>
+        <div style="font-family:var(--f-hand);font-size:11px;color:var(--olive-mid);padding:0 0 14px 4px">a lazy day in the kitchen</div>
+        <div style="display:grid;gap:3px">
+          <div class="pnav"><svg class="ic"><use href="#i-home"/></svg>首页</div>
+          <div class="pnav on"><svg class="ic"><use href="#i-order"/></svg>我要点餐<span class="c">128</span></div>
+          <div class="pnav"><svg class="ic"><use href="#i-dice"/></svg>随机吃什么</div>
+          <div class="pnav"><svg class="ic"><use href="#i-bowl"/></svg>今日点餐<span class="c">4</span></div>
+          <div class="pnav"><svg class="ic"><use href="#i-book"/></svg>我的常吃</div>
+          <div class="pnav"><svg class="ic"><use href="#i-heart"/></svg>我的收藏</div>
+          <div class="pnav"><svg class="ic"><use href="#i-menu3"/></svg>菜品管理</div>
+        </div>
+        <div style="margin-top:14px;padding:12px;border-radius:16px;background:var(--surface);box-shadow:var(--sh-card)">
+          <div style="font-size:11px;color:var(--ink-3);letter-spacing:.08em;text-transform:uppercase">family</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+            <div class="avstack"><div class="av">爸</div><div class="av m">妈</div><div class="av t">娃</div></div>
+            <span style="font-size:12px;font-weight:700">小之家</span></div>
+          <div style="font-size:11px;color:var(--ink-3);margin-top:7px">邀请码 4F2K · 已共享 128 道菜</div>
+        </div>
+      </aside>
+
+      <main style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+          <div style="font-size:17px;font-weight:800">我要点餐 · 正餐 · 荤菜</div>
+          <div style="font-family:var(--f-hand);font-size:14px;color:var(--olive)">chicken + stir fry</div>
+          <div class="search" style="margin-left:auto;width:230px"><svg class="ic"><use href="#i-search"/></svg><span>搜菜名、食材</span></div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <div style="width:132px;flex:0 0 auto;background:var(--surface);border-radius:var(--r-lg);padding:10px;box-shadow:var(--sh-card)">
+            <div style="font-size:9.5px;letter-spacing:.1em;color:var(--ink-3);font-weight:700;margin:0 0 6px 4px">INGREDIENT</div>
+            <div style="display:grid;gap:2px">
+              <div class="pnav" style="padding:7px 9px;font-size:12.5px">猪肉<span class="c">18</span></div>
+              <div class="pnav" style="padding:7px 9px;font-size:12.5px">牛肉<span class="c">12</span></div>
+              <div class="pnav on" style="padding:7px 9px;font-size:12.5px">鸡肉<span class="c">24</span></div>
+              <div class="pnav" style="padding:7px 9px;font-size:12.5px">鱼<span class="c">14</span></div>
+              <div class="pnav" style="padding:7px 9px;font-size:12.5px">虾<span class="c">9</span></div>
+            </div>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div class="chips nowrap" style="margin-bottom:12px">
+              <div class="chip warm on">炒</div><div class="chip">红烧</div><div class="chip">炖</div><div class="chip">蒸</div>
+              <div class="chip">炸</div><div class="chip">煎</div><div class="chip">烤</div><div class="chip">焖</div><div class="chip">卤</div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px">
+              <div class="pcard"><div class="pic"><img src="assets/dish-kungpao.png" alt=""></div><b>宫保鸡丁</b>
+                <div class="row2"><span class="tag hot">辣</span><span class="tag freq">19 次</span>
+                  <div class="add mini" style="margin-left:auto"><svg class="ic"><use href="#i-plus"/></svg></div></div></div>
+              <div class="pcard"><div class="pic"><img src="assets/dish-laziji.png" alt=""></div><b>辣子鸡</b>
+                <div class="row2"><span class="tag hot">爆辣</span><span class="tag off">41 天</span>
+                  <div class="add mini" style="margin-left:auto"><svg class="ic"><use href="#i-plus"/></svg></div></div></div>
+              <div class="pcard"><div class="pic"><img src="assets/dish-pepperchicken.png" alt=""></div><b>青椒炒鸡</b>
+                <div class="row2"><span class="tag">不辣</span><span class="tag fam">儿童</span>
+                  <div class="add mini" style="margin-left:auto;background:var(--terracotta)"><svg class="ic"><use href="#i-check"/></svg></div></div></div>
+              <div class="pcard"><div class="pic"><img src="assets/dish-chickenstir.png" alt=""></div><b>木耳小炒鸡</b>
+                <div class="row2"><span class="tag">家常</span><span class="tag off">63 天</span>
+                  <div class="add mini" style="margin-left:auto"><svg class="ic"><use href="#i-plus"/></svg></div></div></div>
+              <div class="pcard"><div class="pic" style="background:var(--surface-2);display:grid;place-items:center">
+                  <svg class="ic" style="width:26px;height:26px;stroke:var(--olive-mid)"><use href="#i-camera"/></svg></div>
+                <b>宫爆鸡丁（缺图）</b><div class="row2"><span class="tag off">待补图</span></div></div>
+              <div class="pcard" style="display:grid;place-items:center;min-height:150px;border:1.5px dashed var(--line);box-shadow:none;background:transparent">
+                <div style="text-align:center;color:var(--ink-3)"><svg class="ic" style="width:22px;height:22px;margin:0 auto 6px"><use href="#i-plus"/></svg>
+                  <div style="font-size:12px">新增这道菜</div></div></div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <aside style="width:246px;flex:0 0 auto">
+        <div style="background:var(--surface);border-radius:var(--r-lg);padding:14px;box-shadow:var(--sh-card)">
+          <div style="display:flex;align-items:baseline;gap:7px">
+            <b style="font-size:15px">今日点餐</b>
+            <span style="font-family:var(--f-hand);font-size:13px;color:var(--olive)">today</span>
+            <span class="tag" style="margin-left:auto">晚餐</span></div>
+          <div style="display:grid;gap:8px;margin-top:12px">
+            <div style="display:flex;align-items:center;gap:8px"><div class="thw" style="width:34px;height:34px;border-radius:9px"><img src="assets/dish-pepperchicken.png"></div>
+              <span style="font-size:12.5px;font-weight:700;flex:1">青椒炒鸡</span><span style="font-size:11px;color:var(--ink-3)">×1</span></div>
+            <div style="display:flex;align-items:center;gap:8px"><div class="thw" style="width:34px;height:34px;border-radius:9px"><img src="assets/dish-greens.png"></div>
+              <span style="font-size:12.5px;font-weight:700;flex:1">清炒小白菜</span><span style="font-size:11px;color:var(--ink-3)">×1</span></div>
+            <div style="display:flex;align-items:center;gap:8px"><div class="thw" style="width:34px;height:34px;border-radius:9px"><img src="assets/dish-soup.png"></div>
+              <span style="font-size:12.5px;font-weight:700;flex:1">紫菜蛋花汤</span><span style="font-size:11px;color:var(--ink-3)">×1</span></div>
+            <div style="display:flex;align-items:center;gap:8px"><div class="thw" style="width:34px;height:34px;border-radius:9px;--z:1.6"><img src="assets/dish-rice.png"></div>
+              <span style="font-size:12.5px;font-weight:700;flex:1">米饭</span><span style="font-size:11px;color:var(--ink-3)">×3</span></div>
+          </div>
+          <button class="btn p blk" style="margin-top:14px;height:42px">确认点餐</button>
+          <div class="hint" style="text-align:center;margin-top:8px;font-size:11px">草稿 · 妈妈 12:30 建的</div>
+        </div>
+        <div style="margin-top:12px;background:var(--surface);border-radius:var(--r-lg);padding:14px;box-shadow:var(--sh-card)">
+          <div style="font-size:13px;font-weight:800">随机结果<span style="font-family:var(--f-hand);font-size:12px;color:var(--olive);margin-left:6px">random</span></div>
+          <div style="display:flex;align-items:center;gap:9px;margin-top:10px">
+            <div class="thw" style="width:44px;height:44px"><img src="assets/dish-chickenstir.png"></div>
+            <div><b style="font-size:13px">木耳小炒鸡</b>
+              <div style="font-size:10.5px;color:var(--ink-3)">63 天没吃 · 权重 ↑</div></div></div>
+          <div style="display:flex;gap:7px;margin-top:11px">
+            <button class="btn xs o" style="flex:1">换一个</button>
+            <button class="btn xs w" style="flex:1">加进来</button></div>
+        </div>
+        <div class="banner info" style="margin-top:12px;font-size:11.5px"><svg class="ic"><use href="#i-leaf"/></svg>
+          <div>PC 上随机结果<b style="font-size:12px">常驻右栏</b>，不像手机那样占满一屏</div></div>
+      </aside>
+    </div>
+  </div>
+
+  <div class="grid g2" style="margin-top:16px">
+    <div class="panel">
+      <div class="h3">断点规则<span class="en">breakpoints</span></div>
+      <div class="bp" style="margin-top:12px">
+        <div><b>&lt; 640px</b><span>手机（主场景）<br>单列 · 左食材栏 78px · TabBar 5 项 · Dock 吸底</span></div>
+        <div><b>640 – 1279px</b><span>平板 / 大手机<br>菜品双列 · 食材栏收成顶部 chips · 侧栏隐藏</span></div>
+        <div><b>≥ 1280px</b><span>PC<br>三栏：导航 184 / 内容自适应 / 右栏 250</span></div>
+      </div>
+      <ul class="ticks" style="margin-top:16px">
+        <li>断点用 <code>min-width</code> 递进，组件默认写手机样式，桌面只做增强 —— 与 README 33.1 移动端优先一致。</li>
+        <li>PC 上菜品卡从"横排"变"竖排"（图在上），因为横向空间足够展示 4:3 图。</li>
+        <li>手机上的"确认点餐"在 Dock，PC 上移到右栏常驻 —— <b>同一组件换容器，不换逻辑</b>。</li>
+        <li>最大内容宽 1240px 居中，两侧留米白，避免超宽屏上卡片被拉扁。</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <div class="h3">PWA 与可访问性<span class="en">pwa &amp; a11y</span></div>
+      <ul class="ticks">
+        <li>触控目标 ≥ 44×44；加号视觉 32px，用 <code>::after</code> 扩热区到 44px。</li>
+        <li>小字号绿色文字一律用 <code>--olive-deep</code>（5.0:1），<code>--olive</code> 只用于图形和大字号。</li>
+        <li>辣度、常吃次数等不能只靠颜色：标签都带文字（"爆辣""19 次"），色盲下仍可读。</li>
+        <li>手写体 Caveat 只用于装饰性英文，<b>不承载任何必要信息</b>；字体加载失败降级为系统 cursive 也不影响理解。</li>
+        <li>插画一律 <code>alt=""</code> 装饰性处理，菜品图 <code>alt=菜名</code>。</li>
+        <li>离线：Service Worker 缓存 shell + 菜品列表；断网时显示"离线中 · 缓存 128 道菜"而非白屏。</li>
+        <li>iOS 底部安全区用 <code>env(safe-area-inset-bottom)</code>，Dock 与 TabBar 都要加。</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 09 Vue 落地 ============ -->
+<section id="s-code">
+  <div class="sec-head">
+    <span class="n">09</span><h2>落地到 Vue 3</h2><span class="en">handoff</span>
+    <p>本稿的 CSS 变量与类名可以直接搬进项目。下面是 README 第 32 节目录的对应关系 —— 设计稿里每个类都能落到一个具体文件。</p>
+  </div>
+  <div class="grid g2">
+    <div class="panel">
+      <div class="h3">设计令牌<span class="en">src/assets/styles/tokens.css</span></div>
+      <pre style="margin-top:12px"><span class="c">/* 全站唯一色彩来源，禁止在组件里写十六进制 */</span>
+<span class="k">:root</span> {
+  <span class="k">--canvas</span>: <span class="v">#F4F1E9</span>;  <span class="k">--surface</span>: <span class="v">#FFFFFF</span>;
+  <span class="k">--ink</span>: <span class="v">#2A2A24</span>;      <span class="k">--ink-2</span>: <span class="v">#6E6E63</span>;
+  <span class="k">--olive</span>: <span class="v">#8E9348</span>;    <span class="k">--olive-deep</span>: <span class="v">#6E7334</span>;
+  <span class="k">--olive-wash</span>: <span class="v">#EDF0DA</span>;
+  <span class="k">--terracotta</span>: <span class="v">#DE8942</span>; <span class="c">/* 行动 */</span>
+  <span class="k">--mustard</span>: <span class="v">#D8A730</span>;     <span class="c">/* 常吃 */</span>
+  <span class="k">--mauve</span>: <span class="v">#9C7A96</span>;      <span class="c">/* 收藏/人 */</span>
+  <span class="k">--danger</span>: <span class="v">#C0603F</span>;
+  <span class="k">--r-lg</span>: <span class="v">22px</span>; <span class="k">--r-pill</span>: <span class="v">999px</span>;
+  <span class="k">--sh-card</span>: <span class="v">0 6px 18px rgba(94,86,60,.06)</span>;
+  <span class="k">--ease</span>: <span class="v">cubic-bezier(.22,.8,.28,1)</span>;
+}
+<span class="k">@media</span> (prefers-reduced-motion: reduce) {
+  <span class="k">*</span> { <span class="k">animation-duration</span>: <span class="v">.01ms</span> !important; }
+}</pre>
+      <p class="hint" style="margin-top:12px">在 <code>main.js</code> 里 <code>import './assets/styles/tokens.css'</code> 一次即可，组件内只用 <code>var(--*)</code>。</p>
+    </div>
+    <div class="panel">
+      <div class="h3">类名 → 组件映射<span class="en">mapping</span></div>
+      <table style="margin-top:12px">
+        <tr><th>设计稿</th><th>落到文件</th></tr>
+        <tr><td><code>.dish</code></td><td>components/DishCard.vue</td></tr>
+        <tr><td><code>.chip</code> <code>.chips</code> <code>.side</code></td><td>components/DishFilter.vue</td></tr>
+        <tr><td><code>.twocol</code> 内的列表</td><td>components/DishList.vue</td></tr>
+        <tr><td><code>.dice-btn</code> <code>.result</code> <code>.why</code></td><td>components/RandomDish.vue</td></tr>
+        <tr><td><code>.grp</code> + 步进器行</td><td>components/MealCard.vue</td></tr>
+        <tr><td><code>.mosaic</code> <code>.wide</code> <code>.wordmark</code></td><td>views/Home.vue</td></tr>
+        <tr><td><code>.seg</code> <code>.tabbar</code> <code>.dock</code> <code>.sheet</code></td><td>components/base/*（4 个通用件）</td></tr>
+        <tr><td><code>.empty</code> <code>.sk</code> <code>.banner</code> <code>.off-line</code></td><td>components/base/State.vue</td></tr>
+        <tr><td>14 个 <code>assets/*.png</code></td><td>Supabase Storage <code>/dishes/{id}.webp</code></td></tr>
+      </table>
+      <div class="banner info" style="margin-top:14px"><svg class="ic"><use href="#i-list"/></svg>
+        <div><b>分类 / 食材 / 做法 / 标签全部来自数据库</b>
+          原型里写死的"鸡肉 24 / 红烧 / 下饭"只是占位，实现时换成 <code>useIngredients()</code> 等 store getter。</div></div>
+      <div class="banner warn" style="margin-top:10px"><svg class="ic"><use href="#i-dice"/></svg>
+        <div><b>权重条不要在前端算</b>
+          <code>.result .why</code> 只是渲染 <code>utils/random.js</code> 返回的 <code>{dish, score, reasons[]}</code>，保证三端同一套规则。</div></div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:16px">
+    <div class="h3">下一步建议顺序<span class="en">what's next</span></div>
+    <div class="grid g3" style="margin-top:14px">
+      <div style="background:var(--surface-2);border-radius:var(--r-md);padding:15px 17px">
+        <div class="h3" style="font-size:14px">A · 直接开写</div>
+        <p class="hint" style="line-height:1.75">按 README 第 36 节：Vue 3 + Vite 初始化 → 把本稿 CSS 拆进 <code>tokens.css</code> 与组件 → 接 Supabase 跑通"菜品→点餐→历史"。</p></div>
+      <div style="background:var(--surface-2);border-radius:var(--r-md);padding:15px 17px">
+        <div class="h3" style="font-size:14px">B · 先补设计</div>
+        <p class="hint" style="line-height:1.75">再出 3 页：早餐页、火锅页（含随机火锅）、点餐历史 + 家庭偏好页，以及深色纸底版插画。</p></div>
+      <div style="background:var(--surface-2);border-radius:var(--r-md);padding:15px 17px">
+        <div class="h3" style="font-size:14px">C · 先做真实数据</div>
+        <p class="hint" style="line-height:1.75">把 README 15–19 节的建表 SQL 和 30 道种子菜品写出来，用真数据回看这套 UI 的筛选密度是否够。</p></div>
+    </div>
+  </div>
+</section>
+
+<footer class="foot">
+  <div>家庭点餐系统 · 植物手账风格 UI 设计稿 · 核心 6 页高保真原型 · 2026-10-02</div>
+  <div class="en">eat well, together</div>
+</footer>
+
+</div>
+
+<script>
+/* 图标墙：自动列出 defs 中全部 symbol，新增图标不必改文档 */
+(function(){
+  var names={home:'首页',order:'点餐单',dice:'随机',heart:'收藏',clock:'时间',pot:'火锅',bowl:'汤碗',
+    leaf:'叶子',plus:'加',minus:'减',search:'搜索',edit:'编辑',trash:'删除',right:'右',left:'左',
+    down:'下',user:'成员',star:'星标',filter:'筛选',camera:'图片',x:'关闭',check:'完成',swap:'换一个',
+    flame:'辣度',grid:'宫格',book:'常吃',fork:'餐具',tag:'标签',list:'列表',menu3:'菜单本',cal:'日历'};
+  var g=document.getElementById('icogrid');
+  if(!g) return;
+  Array.prototype.forEach.call(document.querySelectorAll('symbol[id^="i-"]'),function(s){
+    var key=s.id.slice(2);
+    var d=document.createElement('div');
+    d.className='ico-cell';
+    d.title=(names[key]||key)+'  ·  #'+s.id;
+    d.innerHTML='<svg class="ic" viewBox="0 0 24 24"><use href="#'+s.id+'"/></svg><span>'+key+'</span>';
+    g.appendChild(d);
+  });
+})();
+
+/* 让原型可点：chip / seg / 侧栏食材 的选中态切换 */
+document.addEventListener('click',function(e){
+  var chip=e.target.closest('.chip');
+  if(chip){ chip.classList.toggle('on'); return; }
+  var seg=e.target.closest('.seg > i');
+  if(seg){ Array.prototype.forEach.call(seg.parentNode.children,function(c){c.classList.remove('on')}); seg.classList.add('on'); return; }
+  var side=e.target.closest('.side > button');
+  if(side){ Array.prototype.forEach.call(side.parentNode.children,function(c){c.classList.remove('on')}); side.classList.add('on'); return; }
+  var tab=e.target.closest('.tabbar a');
+  if(tab){ Array.prototype.forEach.call(tab.parentNode.children,function(c){c.classList.remove('on')}); tab.classList.add('on'); }
+});
+</script>
+</body>
+</html>

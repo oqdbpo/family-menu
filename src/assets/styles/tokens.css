@@ -1,0 +1,50 @@
+/* 自动生成自 design/preview.html 的 :root —— 全站唯一色彩来源，禁止在组件里写十六进制 */
+:root{
+  /* 纸与墨 */
+  --canvas:#F4F1E9;        /* 亚麻米白，全站唯一底色，禁止纯白/纯灰 */
+  --surface:#FFFFFF;       /* 卡片 */
+  --surface-2:#FBF9F3;     /* 卡片内的次级分区 */
+  --ink:#2A2A24;           /* 暖炭黑正文，禁止 #000 */
+  --ink-2:#6E6E63;         /* 次要文字 */
+  --ink-3:#A6A598;         /* 占位/禁用 */
+  --line:#E7E2D2;          /* 发丝线，能用留白就不用它 */
+
+  /* 主色系（取自插画植物） */
+  --olive:#8E9348;         /* 橄榄苔绿 · 品牌主色 · 图标线描 */
+  --olive-deep:#6E7334;    /* 小字号文本必须用它（AA 5:1） */
+  --olive-mid:#C6C57E;     /* 浅苔绿 · 描边/次级强调 */
+  --olive-wash:#EDF0DA;    /* 极浅绿底 · 选中态 */
+
+  /* 点缀（取自插画蔬果），只用于「有意义」的状态 */
+  --terracotta:#DE8942;    /* 陶土橙 · 主行动/随机 */
+  --terracotta-wash:#FAE9D8;
+  --mustard:#D8A730;       /* 芥末黄 · 常吃/高频 */
+  --mustard-wash:#F9F0D6;
+  --mauve:#9C7A96;         /* 灰紫 · 收藏/家庭 */
+  --mauve-wash:#F0E7EF;
+  --danger:#C0603F;        /* 删除/停用，是陶土的暗化版，不引入新色相 */
+
+  /* 圆角 */
+  --r-xl:28px; --r-lg:22px; --r-md:16px; --r-sm:11px; --r-pill:999px;
+
+  /* 阴影：只有一档常规 + 一档浮层，都很轻 */
+  --sh-card:0 1px 2px rgba(94,86,60,.05), 0 6px 18px rgba(94,86,60,.06);
+  --sh-float:0 10px 34px rgba(94,86,60,.16);
+
+  /* 字体 */
+  --f-hand:'Caveat','Segoe Script','Comic Sans MS',cursive;
+  --f-sans:-apple-system,'PingFang SC','HarmonyOS Sans SC','Microsoft YaHei','Noto Sans SC',sans-serif;
+
+  /* 动效 */
+  --t-fast:150ms; --t:240ms; --t-slow:420ms;
+  --ease:cubic-bezier(.22,.8,.28,1);
+  --ease-back:cubic-bezier(.34,1.4,.64,1);
+
+  /* 间距：4 的倍数，卡片内边距固定 16/20 */
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:20px; --s6:28px; --s7:40px;
+
+  /* 设备安全区与内容宽度（真机才有值，桌面回落 0） */
+  --sab:env(safe-area-inset-bottom,0px);
+  --sat:env(safe-area-inset-top,0px);
+  --app-max:560px;
+}

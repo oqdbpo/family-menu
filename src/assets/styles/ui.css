@@ -1,0 +1,379 @@
+/* =============================================================================
+   UI 组件层 —— 类名与 design/preview.html 一一对应，改视觉请先改设计稿
+   与原型稿的差异：去掉手机框相关样式，浮层改为 fixed 定位并计入安全区
+   ========================================================================== */
+
+.ic {
+  fill: none;
+  stroke: var(--olive-deep);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  display: block;
+  /* 兜底尺寸：没有上下文规则时，SVG 会按替换元素默认的 300x150 撑开糊成一大块 */
+  width: 24px; height: 24px;
+}
+/* 图标是 24 单位矢量，缩小时描边会变细，按显示尺寸反向补偿 */
+.iconbtn svg, .navbar .back svg, .stepper button svg, .chip svg, .row .ops svg,
+.search svg, .datebar .nav2 svg, .fambadge svg, .result .why svg,
+.upl .box svg, .empty svg, .off-line svg, .banner svg, .grp button svg { stroke-width: 2.1 }
+.tabbar a svg { stroke-width: 1.9 }
+.dice-btn svg { stroke-width: 1.1 }
+.mosaic .mrow svg { stroke-width: 1.6 }
+.mosaic .big .illu svg { stroke-width: 1.2 }
+
+*, *::before, *::after { box-sizing: border-box }
+
+html { -webkit-text-size-adjust: 100% }
+body {
+  margin: 0;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--f-sans);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+img { display: block; max-width: 100% }
+button { font-family: inherit }
+
+.app {
+  min-height: 100dvh;
+  padding-top: var(--sat);
+  width: 100%;
+  max-width: var(--app-max);
+  margin: 0 auto;
+}
+.app.has-tabbar { padding-bottom: calc(96px + var(--sab)) }
+.app.has-dock   { padding-bottom: calc(96px + var(--sab)) }
+
+.pad { padding: 0 18px }
+.sec-t { display: flex; align-items: baseline; gap: var(--s3); margin: 22px 18px 11px }
+.sec-t b { font-size: 15.5px; font-weight: 800 }
+.sec-t em { font-style: normal; font-family: var(--f-hand); font-size: 13px; color: var(--olive) }
+.sec-t .more { margin-left: auto; font-size: 12px; color: var(--ink-3) }
+
+.wordmark { text-align: center; padding: 2px 18px 0 }
+.wordmark .en { font-family: var(--f-hand); font-size: 34px; color: var(--olive); line-height: 1.05 }
+.wordmark .sub { font-family: var(--f-hand); font-size: 14px; color: var(--olive-mid); line-height: 1; margin-top: 2px }
+
+/* ---------- 卡片 ---------- */
+.card { background: var(--surface); border-radius: var(--r-lg); padding: var(--s4); box-shadow: var(--sh-card) }
+.card.tap { transition: transform var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease); cursor: pointer }
+.card.tap:active { transform: scale(.98) }
+
+.bi { text-align: center; line-height: 1.25 }
+.bi em { display: block; font-style: normal; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); font-weight: 600 }
+.bi b { display: block; font-size: 17px; font-weight: 800; letter-spacing: -.2px; margin-top: 1px }
+
+/* ---------- 按钮 ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  height: 46px; padding: 0 22px; border-radius: var(--r-pill);
+  font-size: 15px; font-weight: 700; border: 0; letter-spacing: -.2px;
+  white-space: nowrap; flex: 0 0 auto; text-decoration: none;
+  transition: all var(--t-fast) var(--ease);
+}
+.btn svg { width: 18px; height: 18px }
+.btn.p { background: var(--olive); color: #fff }
+.btn.p svg { stroke: #fff }
+.btn.w { background: var(--terracotta); color: #fff }
+.btn.w svg { stroke: #fff }
+.btn.o { background: var(--surface); color: var(--olive-deep); box-shadow: inset 0 0 0 1.5px var(--olive-mid) }
+.btn.o svg { stroke: var(--olive-deep) }
+.btn.g { background: var(--olive-wash); color: var(--olive-deep) }
+.btn.sm { height: 34px; padding: 0 14px; font-size: 13px }
+.btn.xs { height: 28px; padding: 0 11px; font-size: 12px }
+.btn.blk { width: 100% }
+.btn:active { transform: scale(.97) }
+.btn:disabled { opacity: .42 }
+
+/* ---------- 筹码 ---------- */
+.chips { display: flex; gap: 8px; flex-wrap: wrap }
+.chips.nowrap { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px }
+.chips.nowrap::-webkit-scrollbar { display: none }
+.chip {
+  display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 14px;
+  flex: 0 0 auto; border: 0; border-radius: var(--r-pill); background: var(--surface);
+  color: var(--ink-2); font-size: 13px; font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--line); cursor: pointer;
+  transition: all var(--t-fast) var(--ease);
+}
+.chip svg { width: 14px; height: 14px; stroke: currentColor }
+.chip.on { background: var(--olive); color: #fff; box-shadow: none }
+.chip.on svg { stroke: #fff }
+.chip.warm { background: var(--terracotta-wash); color: #A85F26; box-shadow: none }
+.chip.warm.on { background: var(--terracotta); color: #fff }
+.chip.m.on { background: var(--mauve); color: #fff }
+.chip.y.on { background: var(--mustard); color: #fff }
+
+/* ---------- 分段控件 ---------- */
+.seg { display: flex; background: var(--surface); border-radius: var(--r-pill); padding: 4px; box-shadow: var(--sh-card) }
+.seg button { flex: 1; border: 0; background: transparent; font: inherit; font-size: 14px; font-weight: 700;
+  color: var(--ink-2); padding: 8px 0; border-radius: var(--r-pill); cursor: pointer;
+  transition: all var(--t) var(--ease) }
+.seg button.on { background: var(--olive-wash); color: var(--olive-deep) }
+.seg.warm button.on { background: var(--terracotta); color: #fff }
+
+/* ---------- 导航 ---------- */
+.navbar { display: flex; align-items: center; gap: var(--s3); padding: 6px 18px 12px }
+.navbar .back { width: 34px; height: 34px; border-radius: var(--r-pill); background: var(--surface);
+  display: grid; place-items: center; box-shadow: var(--sh-card); flex: 0 0 auto; text-decoration: none }
+.navbar .t { line-height: 1.15 }
+.navbar .t b { font-size: 17px; font-weight: 800; letter-spacing: -.2px; display: block }
+.navbar .t em { font-style: normal; display: block; font-family: var(--f-hand); font-size: 13px; color: var(--olive); line-height: 1 }
+.navbar .act { margin-left: auto; display: flex; gap: 8px }
+.iconbtn { width: 34px; height: 34px; border: 0; border-radius: var(--r-pill); background: var(--surface);
+  display: grid; place-items: center; box-shadow: var(--sh-card); cursor: pointer; flex: 0 0 auto;
+  text-decoration: none; color: inherit }
+/* 没有这条，svg 会按替换元素默认的 300x150 撑满，图标会糊成一大块 */
+.iconbtn svg { width: 17px; height: 17px }
+.iconbtn.on svg { stroke: var(--terracotta) }
+
+/* ---------- 菜品卡 ---------- */
+.dish { display: flex; gap: 12px; background: var(--surface); border-radius: var(--r-lg); padding: 11px; box-shadow: var(--sh-card); align-items: center }
+.dish + .dish { margin-top: 10px }
+.thw { width: 66px; height: 66px; border-radius: var(--r-md); flex: 0 0 auto; background: var(--canvas); overflow: hidden }
+.thw img { width: 100%; height: 100%; object-fit: cover; transform: scale(var(--z, 1.26)) }
+.thw.placeholder { display: grid; place-items: center }
+.thw.placeholder svg { width: 20px; height: 20px; stroke: var(--olive-mid) }
+.thg { border-radius: var(--r-md); overflow: hidden; background: var(--canvas); aspect-ratio: 1 }
+.thg img { width: 100%; height: 100%; object-fit: cover; transform: scale(var(--z, 1.26)) }
+.dish .b { flex: 1; min-width: 0 }
+.dish .nm { display: flex; align-items: center; gap: 6px }
+.dish .nm b { font-size: 15px; font-weight: 800; letter-spacing: -.2px }
+.dish .meta { font-size: 11.5px; color: var(--ink-3); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.dish .tags { display: flex; gap: 5px; margin-top: 6px; flex-wrap: wrap }
+.dish .rt { display: flex; flex-direction: column; align-items: center; gap: 7px; flex: 0 0 auto }
+.add { width: 32px; height: 32px; border: 0; border-radius: var(--r-pill); background: var(--olive);
+  display: grid; place-items: center; cursor: pointer; box-shadow: 0 3px 9px rgba(142,147,72,.34);
+  transition: transform var(--t) var(--ease-back) }
+.add svg { width: 17px; height: 17px; stroke: #fff }
+.add:active { transform: scale(.86) }
+.add:disabled { opacity: .3; box-shadow: none; cursor: default }
+.add:disabled:active { transform: none }
+.add.warm { background: var(--terracotta); box-shadow: 0 3px 9px rgba(222,137,66,.34) }
+/* 已选态的显式移除入口，比「把数量按到 0」好找 */
+.rm { width: 22px; height: 22px; border: 0; border-radius: 50%; background: var(--surface-2);
+  display: grid; place-items: center; cursor: pointer; transition: background var(--t-fast) var(--ease) }
+.rm:active { background: #F7E4DC }
+.rm svg { width: 11px; height: 11px; stroke: var(--danger); stroke-width: 2.4 }
+.fav { width: 15px; height: 15px; stroke: var(--mauve); fill: none; flex: 0 0 auto; cursor: pointer }
+.fav.on { fill: var(--mauve); stroke: none }
+
+.tag { font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: var(--r-pill); background: var(--olive-wash); color: var(--olive-deep); white-space: nowrap }
+.tag.hot { background: var(--terracotta-wash); color: #A85F26 }
+.tag.freq { background: var(--mustard-wash); color: #8C6A12 }
+.tag.fam { background: var(--mauve-wash); color: #6E4D69 }
+.tag.off { background: #F1EFE7; color: var(--ink-3) }
+
+.spicy { display: inline-flex; gap: 2px; align-items: center }
+.spicy i { width: 9px; height: 11px; display: block; background: var(--mustard); opacity: .22;
+  clip-path: polygon(50% 0, 78% 34%, 100% 72%, 74% 100%, 26% 100%, 0 72%, 22% 34%) }
+.spicy i.on { opacity: 1; background: var(--terracotta) }
+
+.stepper { display: inline-flex; align-items: center; gap: 2px; background: var(--surface-2); border-radius: var(--r-pill); padding: 3px }
+.stepper button { width: 26px; height: 26px; border: 0; border-radius: var(--r-pill); background: var(--surface);
+  display: grid; place-items: center; box-shadow: var(--sh-card); cursor: pointer }
+.stepper button svg { width: 13px; height: 13px; stroke: var(--olive-deep) }
+.stepper span { min-width: 22px; text-align: center; font-size: 13.5px; font-weight: 800; font-variant-numeric: tabular-nums }
+
+.sw2 { width: 44px; height: 26px; border: 0; border-radius: var(--r-pill); background: var(--olive); position: relative; cursor: pointer; transition: background var(--t) var(--ease); flex: 0 0 auto }
+.sw2::after { content: ''; position: absolute; top: 3px; left: 21px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.18); transition: left var(--t) var(--ease) }
+.sw2.off { background: #DDD8C8 }
+.sw2.off::after { left: 3px }
+
+.av { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 12.5px; font-weight: 800; color: #fff; background: var(--olive); box-shadow: 0 0 0 2.5px var(--canvas) }
+.av:nth-child(3n+2) { background: var(--mauve) }
+.av:nth-child(3n+3) { background: var(--terracotta) }
+.av.lv { background: var(--surface); color: var(--olive-deep); box-shadow: inset 0 0 0 1.5px var(--olive-mid), 0 0 0 2.5px var(--canvas) }
+.avstack { display: flex }
+.avstack .av + .av { margin-left: -9px }
+
+/* ---------- 首页宫格 ---------- */
+/* 下划线要打在真正的 <a> 上：.mosaic 是容器，text-decoration 不会往子元素传 */
+.mosaic .big, .mosaic .mrow, .wide, .fambadge { text-decoration: none; color: inherit }
+.mosaic { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 18px }
+.mosaic .big { grid-row: span 2; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 12px; padding: 22px 14px; text-align: center; border: 0; width: 100%; cursor: pointer }
+.mosaic .big .illu { width: 96px; height: 96px; border-radius: 50%; background: var(--olive-wash); display: grid; place-items: center }
+.mosaic .big .illu svg { width: 52px; height: 52px; stroke: var(--olive-deep) }
+/* 入口主标用深橄榄（白底 5:1 过 AA）；--olive 只有 3.3:1，不能用于小字号 */
+.mosaic .bi b { color: var(--olive-deep) }
+.mosaic .mrow { display: flex; align-items: center; gap: 11px; padding: 15px 16px; border: 0; width: 100%; text-align: left; cursor: pointer }
+.mosaic .mrow svg { width: 26px; height: 26px; stroke: var(--olive-deep); flex: 0 0 auto }
+.mosaic .mrow .bi { text-align: left }
+.mosaic .mrow .bi em { font-size: 9px }
+.mosaic .mrow .bi b { font-size: 15.5px }
+.mosaic .mrow .ar { margin-left: auto; width: 16px; height: 16px; stroke: var(--olive-mid) }
+.wide { margin: 12px 18px 0; background: var(--surface); border-radius: var(--r-lg); padding: 17px 18px; box-shadow: var(--sh-card); display: flex; align-items: center; gap: 14px; border: 0; width: calc(100% - 36px); text-align: left; cursor: pointer }
+.wide .l { flex: 1; line-height: 1.35; min-width: 0 }
+.wide .l b { font-size: 16px; font-weight: 800; display: block }
+.wide .l em { font-style: normal; font-size: 11.5px; color: var(--ink-3); font-family: 'Cascadia Code', Consolas, monospace; letter-spacing: .06em; text-transform: uppercase }
+.wide .l p { font-size: 11.5px; color: var(--ink-3); margin: 3px 0 0 }
+.wide svg { flex: 0 0 auto }
+.wide .ar { width: 16px; height: 16px; stroke: var(--olive-mid) }
+
+/* ---------- 二维筛选 ---------- */
+.twocol { display: flex; align-items: flex-start }
+.side { width: 78px; flex: 0 0 auto; display: flex; flex-direction: column; gap: 2px; padding: 0 0 0 12px }
+.side button { display: block; width: 100%; text-align: center; border: 0; background: transparent;
+  font-size: 13px; font-weight: 700; color: var(--ink-2); padding: 11px 4px; border-radius: 14px 0 0 14px;
+  position: relative; cursor: pointer; transition: all var(--t-fast) var(--ease) }
+.side button.on { background: var(--surface); color: var(--olive-deep); box-shadow: var(--sh-card) }
+.side button.on::before { content: ''; position: absolute; left: -6px; top: 50%; transform: translateY(-50%); width: 4px; height: 19px; border-radius: var(--r-pill); background: var(--olive) }
+.side button .c { display: block; font-size: 10px; color: var(--ink-3); font-weight: 600; font-variant-numeric: tabular-nums }
+.side button.on .c { color: var(--olive-mid) }
+.maincol { flex: 1; min-width: 0; padding: 0 12px 0 10px }
+.micro { font-size: 9.5px; letter-spacing: .1em; color: var(--ink-3); font-weight: 700; text-transform: uppercase }
+
+/* ---------- 随机 ---------- */
+.dice-btn { width: 150px; height: 150px; border-radius: 50%; background: var(--terracotta); border: 0;
+  display: grid; place-items: center; color: #fff; position: relative; margin: 6px auto 0; cursor: pointer;
+  box-shadow: 0 14px 34px rgba(222,137,66,.4), inset 0 -6px 0 rgba(0,0,0,.07) }
+.dice-btn svg { width: 56px; height: 56px; stroke: #fff }
+.dice-btn b { font-size: 16px; font-weight: 800; letter-spacing: 1px; margin-top: 2px }
+.dice-btn::before { content: ''; position: absolute; inset: -11px; border-radius: 50%; border: 1.5px dashed var(--terracotta); opacity: .42; animation: spin 22s linear infinite }
+.dice-btn:disabled { opacity: .6 }
+@keyframes spin { to { transform: rotate(360deg) } }
+@keyframes shake { 0%,100% { transform: rotate(0) } 20% { transform: rotate(-11deg) scale(1.05) } 40% { transform: rotate(9deg) } 60% { transform: rotate(-7deg) } 80% { transform: rotate(5deg) } }
+.dice-btn.rolling svg { animation: shake .62s var(--ease) }
+
+.result { background: var(--surface); border-radius: var(--r-lg); padding: 18px; box-shadow: var(--sh-card) }
+.result .why { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line); display: grid; gap: 7px }
+.result .why div { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--ink-2) }
+.result .why svg { width: 13px; height: 13px; stroke: var(--olive); flex: 0 0 auto }
+.result .why .lbl { width: 66px; flex: 0 0 auto; font-size: 11.5px; color: var(--ink); font-weight: 700 }
+.bar { height: 5px; border-radius: var(--r-pill); background: var(--olive-wash); flex: 1; overflow: hidden }
+.bar i { display: block; height: 100%; background: var(--olive); border-radius: var(--r-pill); transition: width var(--t-slow) var(--ease) }
+.bar.t i { background: var(--terracotta) }
+.bar.y i { background: var(--mustard) }
+.bar.m i { background: var(--mauve) }
+
+/* ---------- 状态 ---------- */
+.empty { display: grid; justify-items: center; gap: 10px; text-align: center; padding: 26px 20px }
+.empty img { width: 170px }
+.empty b { font-size: 15px; font-weight: 800 }
+.empty p { font-size: 12.5px; color: var(--ink-3); max-width: 26ch; margin: 0 }
+.sk { border-radius: var(--r-lg); background: var(--surface); padding: 11px; display: flex; gap: 12px; align-items: center; box-shadow: var(--sh-card) }
+.sk i { display: block; border-radius: var(--r-sm); background: linear-gradient(90deg, #F1EFE7 25%, #E7E4D6 37%, #F1EFE7 63%); background-size: 400% 100%; animation: sk 1.4s var(--ease) infinite }
+@keyframes sk { 0% { background-position: 100% 50% } 100% { background-position: 0 50% } }
+.banner { display: flex; gap: 10px; align-items: flex-start; border-radius: var(--r-md); padding: 12px 14px; font-size: 12.5px; line-height: 1.6 }
+.banner svg { width: 16px; height: 16px; flex: 0 0 auto; margin-top: 2px }
+.banner b { display: block; font-size: 13px; margin-bottom: 1px }
+.banner.info { background: var(--olive-wash); color: var(--olive-deep) }
+.banner.info svg { stroke: var(--olive-deep) }
+.banner.warn { background: var(--terracotta-wash); color: #95531F }
+.banner.warn svg { stroke: #95531F }
+.banner.err { background: #F7E4DC; color: #8E3F22 }
+.banner.err svg { stroke: var(--danger) }
+.off-line { display: grid; place-items: center; gap: 6px; padding: 18px; border-radius: var(--r-lg); border: 1.5px dashed var(--line); color: var(--ink-3); font-size: 12.5px; text-align: center }
+
+/* ---------- 浮层与吸底（fixed 元素要自己对齐 --app-max） ---------- */
+.tabbar { position: fixed; left: 50%; transform: translateX(-50%);
+  width: calc(min(100vw, var(--app-max)) - 24px); bottom: calc(12px + var(--sab)); height: 74px;
+  background: rgba(255,255,255,.94); backdrop-filter: blur(12px); border-radius: 32px;
+  box-shadow: var(--sh-float); display: flex; align-items: flex-start; padding: 11px 8px 0; z-index: 30 }
+.tabbar a { flex: 1; display: grid; justify-items: center; gap: 3px; text-decoration: none; color: var(--ink-3); font-size: 10.5px; font-weight: 700; background: none; border: 0; cursor: pointer }
+.tabbar a svg { width: 22px; height: 22px; stroke: currentColor }
+.tabbar a.on { color: var(--olive-deep) }
+.tabbar a.dice .d { width: 44px; height: 44px; margin-top: -24px; border-radius: 50%; background: var(--terracotta); display: grid; place-items: center; box-shadow: 0 6px 16px rgba(222,137,66,.42) }
+.tabbar a.dice .d svg { width: 23px; height: 23px; stroke: #fff }
+.tabbar a.dice span { color: #A85F26 }
+
+.dock { position: fixed; left: 50%; transform: translateX(-50%); width: min(100vw, var(--app-max));
+  bottom: 0; padding: 14px 18px calc(30px + var(--sab)); z-index: 32;
+  background: linear-gradient(to top, var(--canvas) 62%, rgba(244,241,233,0)); display: flex; gap: 12px; align-items: center }
+.dock .sum { line-height: 1.2; flex: 1 1 auto; min-width: 0 }
+.dock .sum b { font-size: 15px; font-weight: 800; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.dock .sum em { font-style: normal; font-size: 11.5px; color: var(--ink-3); white-space: nowrap }
+
+.fab { position: fixed; right: calc(50% - min(50vw, var(--app-max) / 2) + 18px);
+  bottom: calc(100px + var(--sab)); width: 54px; height: 54px; border-radius: var(--r-pill);
+  background: var(--olive); display: grid; place-items: center; z-index: 31; border: 0; cursor: pointer;
+  box-shadow: 0 10px 22px rgba(110,115,52,.4) }
+.fab svg { width: 24px; height: 24px; stroke: #fff }
+
+.sheet { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; justify-content: flex-end }
+.sheet .mask { position: absolute; inset: 0; background: rgba(42,42,36,.42); backdrop-filter: blur(2px); border: 0 }
+.sheet .pan { position: relative; background: var(--canvas); border-radius: 30px 30px 0 0; padding: 18px 18px calc(28px + var(--sab)); max-height: 82%; overflow-y: auto; box-shadow: var(--sh-float); animation: up var(--t) var(--ease); width: 100%; max-width: var(--app-max); margin: 0 auto }
+@keyframes up { from { transform: translateY(24px); opacity: 0 } }
+.sheet .grab { width: 38px; height: 4px; border-radius: var(--r-pill); background: var(--line); margin: 0 auto 14px }
+.sheet .hd { display: flex; align-items: center; margin-bottom: 16px }
+.sheet .hd b { font-size: 18px; font-weight: 800 }
+.sheet .hd em { font-style: normal; font-family: var(--f-hand); font-size: 14px; color: var(--olive); margin-left: 8px }
+.sheet .hd .x { margin-left: auto }
+
+/* ---------- 表单 ---------- */
+.field { margin-bottom: 14px }
+.field > label { display: flex; align-items: baseline; gap: 7px; font-size: 12px; font-weight: 700; color: var(--ink-2); margin-bottom: 7px }
+.field > label em { font-style: normal; font-family: 'Cascadia Code', Consolas, monospace; font-size: 10.5px; color: var(--ink-3); font-weight: 500 }
+.field > label i { font-style: normal; color: var(--danger) }
+.inp { width: 100%; height: 44px; border: 0; border-radius: var(--r-md); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); padding: 0 14px; font-size: 14px; font-family: inherit; color: var(--ink) }
+.inp::placeholder { color: var(--ink-3) }
+.inp:focus { outline: none; box-shadow: inset 0 0 0 1.5px var(--olive) }
+.sel { position: relative }
+.sel select.inp { appearance: none; -webkit-appearance: none; padding-right: 34px; cursor: pointer }
+.sel::after { content: ''; position: absolute; right: 15px; top: 19px; width: 9px; height: 9px;
+  border-right: 1.8px solid var(--olive-deep); border-bottom: 1.8px solid var(--olive-deep); transform: rotate(45deg); pointer-events: none }
+.upl { display: flex; gap: 9px }
+.upl .box { width: 66px; height: 66px; border: 0; border-radius: var(--r-md); background: var(--surface-2); box-shadow: inset 0 0 0 1.5px var(--line);
+  display: grid; place-items: center; color: var(--ink-3); font-size: 10px; gap: 3px; text-align: center; cursor: pointer }
+.upl .box svg { width: 20px; height: 20px; stroke: var(--olive-mid) }
+.upl img { width: 66px; height: 66px; border-radius: var(--r-md); object-fit: cover; background: var(--canvas) }
+
+/* ---------- 列表 ---------- */
+.row { display: flex; align-items: center; gap: 11px; background: var(--surface); border-radius: var(--r-md); padding: 10px 12px; box-shadow: var(--sh-card) }
+.row + .row { margin-top: 9px }
+.row .thw { width: 46px; height: 46px; border-radius: var(--r-sm) }
+.row .b { flex: 1; min-width: 0 }
+.row .b b { font-size: 14.5px; font-weight: 700; display: block; line-height: 1.3 }
+.row .b em { font-style: normal; display: block; font-size: 11px; color: var(--ink-3); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.row .ops { display: flex; gap: 7px; align-items: center; flex: 0 0 auto }
+.row .ops .iconbtn { width: 28px; height: 28px; box-shadow: none; background: var(--surface-2) }
+.row .ops svg { width: 14px; height: 14px; stroke: var(--olive-deep) }
+.row .ops svg.del { stroke: var(--danger) }
+
+.search { display: flex; align-items: center; gap: 9px; background: var(--surface); border-radius: var(--r-pill); padding: 0 15px; height: 42px; box-shadow: var(--sh-card) }
+.search svg { width: 16px; height: 16px; stroke: var(--ink-3); flex: 0 0 auto }
+.search input { flex: 1; border: 0; background: none; font: inherit; font-size: 13.5px; color: var(--ink); outline: none; min-width: 0 }
+.search input::placeholder { color: var(--ink-3) }
+
+.grp { display: flex; align-items: center; gap: 8px; margin: 18px 18px 9px }
+.grp b { font-size: 12px; font-weight: 800; letter-spacing: .04em; color: var(--olive-deep) }
+.grp em { font-style: normal; font-family: 'Cascadia Code', Consolas, monospace; font-size: 10px; color: var(--ink-3) }
+.grp .dash { flex: 1; border-top: 1px dashed var(--line) }
+
+.net { display: grid; grid-template-columns: 1fr 1fr; gap: 11px }
+.net .c { background: var(--surface); border-radius: var(--r-lg); padding: 9px; box-shadow: var(--sh-card); position: relative; text-decoration: none; color: inherit }
+.net .c .n { font-size: 13.5px; font-weight: 800; margin-top: 8px; line-height: 1.3 }
+.net .c .s { font-size: 10.5px; color: var(--ink-3); margin-top: 2px }
+.net .c .badge { position: absolute; top: 15px; right: 15px; background: var(--mustard); color: #fff; font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: var(--r-pill); box-shadow: 0 3px 8px rgba(216,167,48,.4) }
+.net .c .badge.m { background: var(--mauve); box-shadow: 0 3px 8px rgba(156,122,150,.4) }
+
+.stats { display: flex; background: var(--surface); border-radius: var(--r-lg); padding: 14px 6px; box-shadow: var(--sh-card) }
+.stats > div { flex: 1; text-align: center; position: relative }
+.stats > div + div::before { content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 1px; height: 26px; background: var(--line) }
+.stats b { display: block; font-size: 19px; font-weight: 800; color: var(--olive-deep); letter-spacing: -.5px; font-variant-numeric: tabular-nums }
+.stats em { display: block; font-style: normal; font-size: 10.5px; color: var(--ink-3); margin-top: 1px }
+
+.datebar { display: flex; align-items: center; gap: 12px; padding: 2px 18px 12px }
+.datebar .d { line-height: 1.15; position: relative; cursor: pointer }
+/* 虚线下划线 = 可点的暗示；真正的点击热区是盖在上面的透明 date input */
+.datebar .d b { font-size: 19px; font-weight: 800; letter-spacing: -.3px; border-bottom: 1.5px dotted var(--olive-mid); padding-bottom: 1px }
+.datebar .d em { font-style: normal; display: block; font-family: var(--f-hand); font-size: 13px; color: var(--olive) }
+.dateshim { position: absolute; inset: -4px 0 0; width: 100%; height: calc(100% + 4px);
+  opacity: 0; border: 0; background: none; cursor: pointer; font-size: 16px }
+.fambadge { display: flex; align-items: center; gap: 7px; background: var(--surface); border-radius: var(--r-pill); padding: 5px 12px 5px 6px; box-shadow: var(--sh-card); margin: 0 auto; width: max-content; font-size: 12px; font-weight: 700; color: var(--ink-2); border: 0; cursor: pointer }
+
+.hint { font-size: 12.5px; color: var(--ink-3) }
+/* 刷新中的反馈：没有这条，点刷新按钮看起来像没反应（keyframes spin 见 .dice-btn） */
+.spin { animation: spin .8s linear infinite }
+button:disabled { cursor: default }
+.hint b { color: var(--olive-deep); font-weight: 700 }
+.hand { font-family: var(--f-hand); color: var(--olive-mid) }
+.mono { font-family: 'Cascadia Code', Consolas, monospace; font-variant-numeric: tabular-nums }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important }
+}
