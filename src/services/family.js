@@ -37,6 +37,22 @@ export async function renameSelf(name) {
   if (error) throw error;
 }
 
+// 成员管理页用：把「有没有绑设备 / 是不是我自己 / 名下多少偏好和多少顿」一次拿回，
+// 这样删除确认里能如实写出代价，而不是等删完才告诉用户偏好没了
+export async function memberOverview() {
+  const { data, error } = await sb.rpc('member_overview');
+  if (error) throw error;
+  return data || [];
+}
+
+// 守卫全在数据库里（0004）：不能删自己、只能删本家庭的人。
+// 这里不预判，否则离线/缓存不一致时前端会给出假的安全感
+export async function removeMember(id) {
+  const { data, error } = await sb.rpc('remove_member', { p_member: id });
+  if (error) throw error;
+  return data;
+}
+
 // 偏好投票：饭桌上最常发生、也最该在断网时还能点
 export async function vote(dishId, pref) {
   const me = await currentMemberId();

@@ -1202,11 +1202,12 @@ PWA 手机体验优化
 ③ node supabase/run-sql.mjs supabase/migrations/0001_init.sql
 ④ node supabase/run-sql.mjs supabase/migrations/0002_family_id_default.sql
    node supabase/run-sql.mjs supabase/migrations/0003_table_plan_unique.sql
+   node supabase/run-sql.mjs supabase/migrations/0004_member_management.sql
 ⑤ node supabase/run-sql.mjs supabase/seed.sql
 ⑥ 通知 PostgREST 重载 schema 缓存：
      notify pgrst, 'reload schema';
      ↑ 不做这步，/rest/v1/rpc/* 会返回 404 "requested path is invalid"
-⑦ node supabase/verify.mjs --write     只读 6 项，加 --write 走写链路共 7 项，全绿才算通
+⑦ node supabase/verify.mjs --write     只读 11 项，加 --write 走写链路共 12 项，全绿才算通
 ⑧ 建 GitHub 仓库并推送，配 4 项 Actions Secrets/Variables，手动 Run 一次 workflow
 ```
 
@@ -1339,7 +1340,7 @@ supabase rpc random_table(people, meal_type)
 | `supabase/migrations/0002_family_id_default.sql` | 已执行 |
 | `supabase/seed.sql` | 已执行，30 道菜 + 11 条历史订单 |
 | Storage `dish-images` | 11 张菜品插画已上传并回填 `image_path`，剩 19 道待家人实拍 |
-| `supabase/verify.mjs` | 只读 6 项全绿；加 `--write` 走 confirm 链路共 7 项（含 RLS 隔离、随机权重、confirm 幂等）。**跑完自动删掉本次的匿名身份**，不再往示范家庭堆陌生成员；要看现场加 `--keep-session` |
+| `supabase/verify.mjs` | 只读 11 项全绿；加 `--write` 走 confirm 链路共 12 项（含 RLS 隔离、随机权重、成员守卫、confirm 幂等）。**跑完自动删掉本次的匿名身份**，不再往示范家庭堆陌生成员；要看现场加 `--keep-session` |
 | `.github/workflows/keepalive.yml` | **已上线并跑通**：首次手动运行 `conclusion=success`，PostgREST 返回 200，心跳提交已由 `keepalive-bot` 推回仓库 |
 | GitHub 仓库 | `oqdbpo/family-menu`，**public**（Pages 免费档不支持私有库），main 分支 |
 | GitHub Pages | **已上线** `https://oqdbpo.github.io/family-menu/`；`deploy-web` run #1 success；强制直连实测首页 / manifest / sw.js / 图标 / JS 主包全部 200 |
@@ -1347,7 +1348,9 @@ supabase rpc random_table(people, meal_type)
 | PWA 图标 | `public/icons/` 四件套（192 / 512 / apple-touch / maskable），由 `tools/img.mjs --crop` 从主视觉裁出。此前 manifest 引用了不存在的文件，PWA 装上去会没图标 |
 | Actions Secrets & Variables | `SB_ANON_KEY` `SB_MGMT_TOKEN`（Secrets）+ `SB_URL` `SB_PROJECT_REF`（Variables）全部写入 |
 | `design/_raw/` | **不进仓库**（17 MB 未处理原件，本地保留；`design/assets/` 才是产物） |
-| `src/` Vue 3 前端 | 6 个页面 + 加入家庭页，已连真实数据跑通；**未做视觉截图核对** |
+| `src/` Vue 3 前端 | 7 个页面（含新增的家庭成员页）+ 加入家庭页，已连真实数据跑通 |
+| `migrations/0004` + 成员管理页 | **已在真机点过一遍**：浏览器里移除示范成员 → 回读数据库确认真删了、偏好级联没了 → 重跑 seed 复位。见 37.10 |
+| `tools/dev-tunnel.mjs` | 本地隧道。给不吃系统代理的浏览器（内置预览面板）开一条到 Supabase 的真数据通路，见 37.10.1 |
 | `worker/` Supabase 反代 | **代码就绪、联调通过，等一个域名**。23 项逻辑自测全绿；真打上游验证过 5 条路径（见 37.9） |
 
 ## 37.6.1 仓库与凭据的当前约定
@@ -1466,6 +1469,60 @@ GitHub runner 和本机都在境外/有代理，直连更快，且少一层依�
 所以清单第 5 步要求先在**这台电脑**上 `curl --noproxy '*'` 测 `/healthz`，
 再用**手机移动网络**测一次——两个都通才继续。不通的退路按代价从低到高排在清单末尾，
 最坏一档（付费套餐拿独立 IP，¥160+/月）就不划算了，那时该重新评估微信云开发。
+
+## 37.10 家庭成员管理（0004 + Family.vue）
+
+按已确认的三条决定实现：**任何成员都能移除别人 · 不能移除自己 · 照常可删但删前说清代价**。
+
+```text
+member_overview()      security invoker。一次带回 是否绑设备 / 是不是我 / 名下偏好数 / 名下订单数
+remove_member(uuid)    security definer。四道校验后真删，返回被删者姓名
+Family.vue             #/family，从「我的」顶部那张成员卡片进
+```
+
+**为什么不直接开一条 `for delete` 的 RLS 策略**：`family_members` 上原本只有
+`mem_read`（本家庭可读）和 `mem_self`（只改自己）。一旦加上
+`for delete using (family_id = current_family_id())`，任何人都能绕过"不能删自己"
+直接用 REST 删任意行——前端把按钮藏起来完全不算数。所以校验写在函数里，函数用定义者权限。
+
+**没写"至少留一个人"的判断，因为那是条不可达分支**：调用者自己就是成员，删自己又被挡住，
+所以家里行数永远 ≥ 1；删到只剩自己之后也删不动任何人，流程自然终止。
+写上这种判断只会让后来的人误以为"零成员"是一种需要处理的合法状态。
+
+**级联后果（UI 必须提前摊开，别等人删了才说）**：
+
+| 关联 | 效果 |
+|---|---|
+| `member_dish_preferences` | `on delete cascade` —— TA 投的票**真没了**，随机算法「全家平均」权重跟着变 |
+| `meal_orders.created_by` | `on delete set null` —— 历史订单**保留**，只是不再显示是谁点的 |
+
+删除确认弹窗按目标实际数据分支：有偏好才提偏好、有订单才提订单、
+绑了设备就提示"那台设备会掉出这个家，要重新填邀请码"，没绑设备就说"不影响任何人的手机"。
+示范数据里那三个未绑设备的占位成员因此一眼可辨（`未绑定设备` 徽章 + `.av.lv` 空心头像）。
+
+**顺手修掉的两处**：底部导航停在「我的」时高亮的却是「常吃」（`/dishes` 的 `meta.tab` 写错）；
+`<a class="card tap">` 会冒出 UA 下划线——同一条坑这已经是第三次踩，
+所以把 `.card.tap` 并进那条统一去下划线的选择器，而不是就地写内联样式。
+
+### 37.10.1 本地隧道：内置浏览器不吃系统代理
+
+预览面板不读 Windows 系统代理，所以对着它永远连不上 Supabase，
+任何要真数据的界面都没法人工点一遍。`tools/dev-tunnel.mjs` 把
+`http://127.0.0.1:8790/**` 搬到 `SB_URL/**`（它自己走代理回源），本地 dev 就能拿真数据跑：
+
+```bash
+node tools/dev-tunnel.mjs     # 终端 1
+npx vite                      # 终端 2
+```
+
+前提是 `.env` 里的 `VITE_SB_URL` 指向隧道，也就是把 `supabase/.env.local` 的
+`SB_PROXY_URL` 填上再跑 `node tools/gen-env.mjs`。
+
+⚠ **Vite 里 `.env` 文件的值优先于 `process.env`**，所以
+`VITE_SB_URL=http://127.0.0.1:8790 npx vite` 这种覆盖是无效的——
+界面照样打真域名、照样卡在「正在叫醒厨房」，看着像前端的 bug。
+必须走 `gen-env.mjs` 改 `.env`（实测踩出来的）。
+隧道只给本地验收用，**别指向真家庭**，它产生的是真实写入。
 
 
 ---

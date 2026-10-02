@@ -197,7 +197,9 @@ button { font-family: inherit }
 
 /* ---------- 首页宫格 ---------- */
 /* 下划线要打在真正的 <a> 上：.mosaic 是容器，text-decoration 不会往子元素传 */
-.mosaic .big, .mosaic .mrow, .wide, .fambadge { text-decoration: none; color: inherit }
+/* RouterLink 渲染成 <a>，UA 默认给下划线；凡是当卡片/徽章用的链接都要在这里统一清掉，
+   漏一个就会在真机上冒出一条下划线（.mosaic 和 .fambadge 都漏过）。.card.tap 也在这类里 */
+.mosaic .big, .mosaic .mrow, .wide, .fambadge, .card.tap { text-decoration: none; color: inherit }
 .mosaic { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 18px }
 .mosaic .big { grid-row: span 2; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 12px; padding: 22px 14px; text-align: center; border: 0; width: 100%; cursor: pointer }
 .mosaic .big .illu { width: 96px; height: 96px; border-radius: 50%; background: var(--olive-wash); display: grid; place-items: center }

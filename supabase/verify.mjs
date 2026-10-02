@@ -62,14 +62,16 @@ if (!URL || !KEY) {
 
 let token = null;
 let uid = null;
+const identities = [];        // 本次跑测创建的所有匿名身份，结尾统一清掉
 const results = [];
 function say(name, ok, detail = '') {
   results.push({ name, ok });
   console.log(`${ok ? '  PASS' : '  FAIL'}  ${name}${detail ? '  — ' + detail : ''}`);
 }
-async function call(p, { method = 'GET', body, auth = false, prefer } = {}) {
+// tok 用来临时以另一个身份发请求（成员管理要在 A 的会话里操作 B 的行）
+async function call(p, { method = 'GET', body, auth = false, prefer, tok } = {}) {
   const headers = { apikey: KEY, 'Content-Type': 'application/json' };
-  if (auth) headers.Authorization = `Bearer ${token}`;
+  if (auth) headers.Authorization = `Bearer ${tok || token}`;
   if (prefer) headers.Prefer = prefer;
   const res = await fetch(URL + p, { method, headers, body: body ? JSON.stringify(body) : undefined });
   const text = await res.text();
@@ -89,6 +91,7 @@ try {
   const r = await call('/auth/v1/signup', { method: 'POST', body: { anonymous: true } });
   token = r.access_token;
   uid = r.user?.id;
+  if (uid) identities.push(uid);
   say('匿名登录拿到 access_token', !!token, uid ? `uid ${uid.slice(0, 8)}…` : '');
   if (!token) throw new Error('响应里没有 access_token');
 } catch (e) {
@@ -152,7 +155,61 @@ try {
   say('random_table', false, e.message);
 }
 
-// ---------- 7. 可选：确认点餐全链路 ----------
+// ---------- 7. 成员管理：看得见 → 删自己必须被拒 → 删别人成功且真的消失 ----------
+{
+  const tag = `${Date.now() % 100000}`;
+  const guestName = `临时成员${tag}`;
+  let guest = null;          // { token, uid, member }
+  try {
+    const b = await call('/auth/v1/signup', { method: 'POST', body: { anonymous: true } });
+    guest = { token: b.access_token, uid: b.user?.id };
+    if (guest.uid) identities.push(guest.uid);
+    guest.member = await call('/rest/v1/rpc/join_family',
+      { method: 'POST', body: { p_code: 'DEMO01', p_name: guestName }, auth: true, tok: guest.token });
+
+    const list = await call('/rest/v1/rpc/member_overview', { method: 'POST', body: {}, auth: true });
+    const me = list.find(m => m.is_self);
+    const g  = list.find(m => m.name === guestName);
+    const ghosts = list.filter(m => !m.bound);
+    say('member_overview 认得出我是谁', !!me && list.filter(m => m.is_self).length === 1,
+        me ? `我 = ${me.name} · 共 ${list.length} 人（${ghosts.length} 个未绑设备）` : '没找到 is_self 行');
+    say('新加入的设备被标成已绑定，种子占位标成未绑定',
+        !!g && g.bound === true && ghosts.length === 3 && ghosts.every(x => x.bound === false),
+        g ? `${guestName} bound=${g.bound}` : '列表里没有新成员');
+
+    // 关键守卫：删自己必须被数据库拒绝，而不是靠前端藏按钮
+    let refused = '';
+    try {
+      await call('/rest/v1/rpc/remove_member', { method: 'POST', body: { p_member: me.id }, auth: true });
+    } catch (e) { refused = e.message; }
+    say('remove_member 拒绝删自己', /不能删掉自己/.test(refused), refused || '没报错，被删掉了！');
+
+    const removedName = await call('/rest/v1/rpc/remove_member',
+      { method: 'POST', body: { p_member: guest.member }, auth: true });
+    const after = await call('/rest/v1/rpc/member_overview', { method: 'POST', body: {}, auth: true });
+    say('remove_member 删掉别人并返回其名',
+        removedName === guestName && !after.some(m => m.name === guestName),
+        `返回「${removedName}」· 剩下 ${after.length} 人`);
+
+    // 别人的成员行删不掉（越权尝试：拿一个不存在的 uuid）
+    let foreign = '';
+    try {
+      await call('/rest/v1/rpc/remove_member',
+        { method: 'POST', body: { p_member: '00000000-0000-0000-0000-000000000000' }, auth: true });
+    } catch (e) { foreign = e.message; }
+    say('拿别处的 member id 来删会被挡', /家里没有这名成员/.test(foreign), foreign || '没报错');
+  } catch (e) {
+    say('成员管理链路', false, e.message);
+  } finally {
+    // 中途失败也别把临时成员留在示范家庭里
+    if (guest?.member) {
+      await call('/rest/v1/rpc/remove_member',
+        { method: 'POST', body: { p_member: guest.member }, auth: true }).catch(() => {});
+    }
+  }
+}
+
+// ---------- 8. 可选：确认点餐全链路 ----------
 if (WRITE_TEST) {
   const DEMO_FAMILY = '11111111-1111-1111-1111-111111111111';
   const today = new Date().toISOString().slice(0, 10);
@@ -196,33 +253,40 @@ if (WRITE_TEST) {
   console.log('  SKIP  确认点餐全链路（加 --write 开启，会往示范家庭写一条记录）');
 }
 
-// ---------- 8. 自清理：删掉本次用的匿名身份 ----------
+// ---------- 9. 自清理：删掉本次创建的所有匿名身份 ----------
 // 第 2 项检查的前提是"这个会话还没加入任何家庭"，所以每轮都必须新签一个身份，
 // 不能复用缓存 token。代价是不管的话，示范家庭里会一路堆陌生成员
 // （实测几轮下来攒了 4 个"新成员/自检设备"）。默认自己擦干净；
 // 想在 app 里以这个身份看现场，加 --keep-session。
 // auth.users 上 family_members 是 on delete cascade，删身份即连带删成员行。
-if (!process.argv.includes('--keep-session') && /^[0-9a-f-]{36}$/i.test(String(uid))) {
-  const REF = env.SB_PROJECT_REF, TOK = env.SB_MGMT_TOKEN;
-  if (!REF || !TOK) {
-    console.log('  SKIP  自清理（supabase/.env.local 缺 SB_PROJECT_REF / SB_MGMT_TOKEN）');
-    console.log(`        本次身份 uid ${uid.slice(0, 8)}… 留在示范家庭里了，需要的话手动删`);
+{
+  const keep = process.argv.includes('--keep-session');
+  // uid 来自服务端 auth，仍然先验一遍格式再拼进 SQL
+  const uuids = identities.filter(u => /^[0-9a-f-]{36}$/i.test(String(u)));
+  if (keep) {
+    console.log(`  SKIP  自清理（--keep-session）—— 保留 ${uuids.length} 个身份`);
+  } else if (!uuids.length) {
+    console.log('  SKIP  自清理（本轮没有可删身份）');
   } else {
-    try {
-      const r = await fetch(`https://api.supabase.com/v1/projects/${REF}/database/query`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${TOK}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: `delete from auth.users where id = '${uid}'::uuid;` }),
-      });
-      const t = await r.text();
-      if (!r.ok) throw new Error(`HTTP ${r.status} ${t.slice(0, 120)}`);
-      console.log(`        自清理：已删除本次身份 uid ${uid.slice(0, 8)}…（连带其成员行）`);
-    } catch (e) {
-      console.log(`  WARN  自清理失败，身份可能残留 —— ${e.message}`);
+    const REF = env.SB_PROJECT_REF, TOK = env.SB_MGMT_TOKEN;
+    if (!REF || !TOK) {
+      console.log('  SKIP  自清理（supabase/.env.local 缺 SB_PROJECT_REF / SB_MGMT_TOKEN）');
+      console.log(`        ${uuids.length} 个身份留在库里：${uuids.map(u => u.slice(0, 8)).join(' ')}`);
+    } else {
+      try {
+        const r = await fetch(`https://api.supabase.com/v1/projects/${REF}/database/query`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${TOK}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: `delete from auth.users where id in (${uuids.map(u => `'${u}'::uuid`).join(', ')});` }),
+        });
+        const t = await r.text();
+        if (!r.ok) throw new Error(`HTTP ${r.status} ${t.slice(0, 120)}`);
+        console.log(`        自清理：已删除本次 ${uuids.length} 个匿名身份（连带其成员行）`);
+      } catch (e) {
+        console.log(`  WARN  自清理失败，身份可能残留 —— ${e.message}`);
+      }
     }
   }
-} else if (uid) {
-  console.log(`  SKIP  自清理（--keep-session）—— uid ${uid.slice(0, 8)}…`);
 }
 
 // ---------- 汇总 ----------

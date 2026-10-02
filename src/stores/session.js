@@ -68,6 +68,12 @@ export const useSessionStore = defineStore('session', () => {
 
   async function refreshDicts() { dicts.value = await loadDicts(true); }
 
+  // 成员管理页改过人之后，首页徽章和「我的」卡片上的人数要跟着变
+  async function reloadMembers() {
+    if (!family.value) return;
+    members.value = await listMembers();
+  }
+
   if (typeof window !== 'undefined') {
     window.addEventListener('online', async () => {
       online.value = true;
@@ -80,5 +86,5 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   return { booted, busy, error, family, familyId, members, dicts, online, pending,
-           ingredients, methods, tags, boot, retry, enter, join, refreshDicts };
+           ingredients, methods, tags, boot, retry, enter, join, refreshDicts, reloadMembers };
 });

@@ -9,7 +9,10 @@ const routes = [
   { path: '/random',   name: 'random',    component: () => import('../views/Random.vue'),    meta: { tab: 'random', chrome: 'tab' } },
   { path: '/today',    name: 'today',     component: () => import('../views/TodayOrder.vue'),meta: { tab: 'today', chrome: 'dock' } },
   { path: '/favorites',name: 'favorites', component: () => import('../views/Favorites.vue'), meta: { tab: 'favorites', chrome: 'tab' } },
-  { path: '/dishes',   name: 'dishes',    component: () => import('../views/DishManage.vue'),meta: { tab: 'favorites', chrome: 'tab' } },
+  // meta.tab 是底部哪一格亮。/dishes 挂在「我的」这格下（TabBar 的 me → /dishes），
+  // 之前误写成 favorites，导致停在"我的"页时高亮的是"常吃"
+  { path: '/dishes',   name: 'dishes',    component: () => import('../views/DishManage.vue'),meta: { tab: 'me', chrome: 'tab' } },
+  { path: '/family',   name: 'family',    component: () => import('../views/Family.vue'),    meta: { tab: 'me', chrome: 'tab' } },
   { path: '/:any(.*)', redirect: '/' },
 ];
 

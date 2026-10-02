@@ -42,7 +42,8 @@ export default {
       return corsHeaders(new Response(null, { status: 204 }), origin, env, {
         'access-control-allow-methods': 'GET,HEAD,POST,PATCH,PUT,DELETE,OPTIONS',
         'access-control-allow-headers': req.headers.get('access-control-request-headers')
-          || 'apikey,authorization,content-type,x-client-info,x-supabase-accept-lang,prefer',
+          || 'apikey,authorization,content-type,x-client-info,x-supabase-accept-lang,'
+             + 'x-supabase-api-version,prefer,content-profile,accept-profile',
         'access-control-max-age': '7200',
       });
     }

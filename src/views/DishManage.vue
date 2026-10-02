@@ -17,6 +17,22 @@
       </div>
     </div>
 
+    <div class="pad" style="margin-top:11px">
+      <RouterLink to="/family" class="card tap" style="display:flex;align-items:center;gap:12px">
+        <span class="avstack">
+          <span v-for="m in session.members.slice(0, 4)" :key="m.id" class="av">
+            {{ (m.name || '家').trim().slice(0, 1) }}
+          </span>
+        </span>
+        <div style="flex:1;min-width:0">
+          <b style="display:block;font-size:14.5px">家庭成员</b>
+          <span class="hint">{{ session.members.length }} 人 · 邀请码
+            <b class="mono">{{ session.family?.invite_code || '——' }}</b> · 看看都有谁</span>
+        </div>
+        <Ic name="right" :size="16" />
+      </RouterLink>
+    </div>
+
     <div class="pad" style="margin-top:11px"><div class="chips nowrap">
       <button v-for="p in panels" :key="p.key" class="chip" :class="{ on: panel === p.key }" @click="panel = p.key">
         {{ p.label }} {{ counts[p.key] }}
@@ -93,9 +109,11 @@ import StateBlock from '../components/StateBlock.vue';
 import DishForm from '../components/DishForm.vue';
 import { fetchDishes, removeDish } from '../services/dishes';
 import { useDishStore, daysSince } from '../stores/dishes';
+import { useSessionStore } from '../stores/session';
 import { useDicts } from '../composables/useDicts';
 
 const dishes = useDishStore();
+const session = useSessionStore();
 const { ingredientName, methodName } = useDicts();
 const rows = ref([]);
 const loading = ref(false);
