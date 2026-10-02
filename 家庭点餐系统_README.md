@@ -943,10 +943,26 @@ cooking_method = 红烧
 家庭点餐恰好是低频应用（出门旅游两周就中招），所以保活工作流不是优化项，
 是**防止全家数据消失的保险丝**。详见第 37 节。
 
-**二、`*.github.io` 与 `*.supabase.co` 在中国大陆均为间歇可达。**
-不是慢，是某些运营商 / 某些时段直接打不开。你自己有代理不代表家人有。
-缓解手段是 PWA 离线优先（37.4），彻底解决需要自购已备案域名 + 国内托管，
-那是 239 元/年 起的事，等真的被家人抱怨了再上。
+**二、可达性实测结论（2026-10-03，强制 `--noproxy` 直连，每项 3 次）**
+
+开发机开着 Windows 系统代理（`127.0.0.1:7897`），**会污染一切可达性测试**——
+不加 `--noproxy '*'` 得到的"能访问"是假的。强制直连后的真实结果：
+
+| 域名 | 结果 | 含义 |
+|---|---|---|
+| `oqdbpo.github.io` | **200 ×3** | ✅ 前端已上线，家人手机能打开 |
+| `fonts.googleapis.com` / `gstatic` | 200 / 404 | ✅ 手写体能加载，设计语言不受影响 |
+| `pages.dev` | 301 ×3 | ✅ 备选前端托管可用 |
+| `*.workers.dev` | 超时 ×3 | ❌ 反代必须挂自定义域名，不能用免费子域 |
+| `*.supabase.co` | **RESET ×21** | ❌ 唯一被硬挡的一环 |
+
+所以问题被收窄成一件事：**不是 GitHub Pages 不行，也不是 Supabase 这个数据库不行，
+而是 `*.supabase.co` 这一个通配域名被 SNI 过滤。** 换任何境外数据库都一样被挡，
+境内方案则要服务器 + 备案。出路只有"域名 + Worker 反代"这一条，约 65 元/年。
+
+**当前实际状态**：前端已可分享（`https://oqdbpo.github.io/family-menu/`），
+但家人打开后会停在「正在叫醒厨房」态——页面能加载，数据不能。
+在反代落地之前，这个链接只有开着代理的人能用。
 
 如果实际使用人数和数据量以后明显增加，再根据实际情况升级。
 
@@ -1323,7 +1339,10 @@ supabase rpc random_table(people, meal_type)
 | Storage `dish-images` | 11 张菜品插画已上传并回填 `image_path`，剩 19 道待家人实拍 |
 | `supabase/verify.mjs` | 10 项全绿（含 RLS 隔离、随机权重、confirm 幂等） |
 | `.github/workflows/keepalive.yml` | **已上线并跑通**：首次手动运行 `conclusion=success`，PostgREST 返回 200，心跳提交已由 `keepalive-bot` 推回仓库 |
-| GitHub 仓库 | `oqdbpo/family-menu`（**private**），main 分支，70 个跟踪文件 / 约 7 MB |
+| GitHub 仓库 | `oqdbpo/family-menu`，**public**（Pages 免费档不支持私有库），main 分支 |
+| GitHub Pages | **已上线** `https://oqdbpo.github.io/family-menu/`；`deploy-web` run #1 success；强制直连实测首页 / manifest / sw.js / 图标 / JS 主包全部 200 |
+| 部署方式 | push 到 main 自动触发 `.github/workflows/deploy.yml`；后端地址在构建时从 Actions Variables/Secrets 注入，不进仓库 |
+| PWA 图标 | `public/icons/` 四件套（192 / 512 / apple-touch / maskable），由 `tools/img.mjs --crop` 从主视觉裁出。此前 manifest 引用了不存在的文件，PWA 装上去会没图标 |
 | Actions Secrets & Variables | `SB_ANON_KEY` `SB_MGMT_TOKEN`（Secrets）+ `SB_URL` `SB_PROJECT_REF`（Variables）全部写入 |
 | `design/_raw/` | **不进仓库**（17 MB 未处理原件，本地保留；`design/assets/` 才是产物） |
 | `src/` Vue 3 前端 | 6 个页面 + 加入家庭页，已连真实数据跑通；**未做视觉截图核对** |
