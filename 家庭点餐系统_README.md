@@ -1215,13 +1215,14 @@ PWA 手机体验优化
 > 因为编辑器以属主身份运行、绕过 RLS。要验证 RLS 必须用 anon key 通过 PostgREST
 > 发请求——`verify.mjs` 第 2 项干的就是这件事：未加入家庭时必须读到 0 行。
 
-## 37.1.1 实测踩到的三个坑（都已修，记录原因）
+## 37.1.1 实测踩到的四个坑（都已修，记录原因）
 
 | 现象 | 根因 | 修法 |
 |---|---|---|
 | 迁移报 `loop variable of loop over rows must be a record variable` | `random_table` 内层 `for r in` 的 `r` 没声明 | 0001 里补 `r record` |
 | `/rest/v1/rpc/join_family` 返回 404 | PostgREST schema 缓存未刷新；另外 RPC 路径必须带 `/rest/v1` 前缀 | `notify pgrst,'reload schema'` |
 | 插 meal_orders 报 403 RLS | `family_id` 要客户端显式传，漏传即违反 with check；且让客户端提供租户 ID 本身是反模式 | 0002 改成列默认值 `current_family_id()`，客户端不碰这列 |
+| 随机配菜出 11 道菜（设计是 4 个槽） | `seed.sql` 里每条 insert 都带了 `on conflict` 兜底，**唯独 `table_plan` 漏了**，而建表时又没给它唯一键。我为清理误删数据重跑了 3 次 seed，`table_plan` 就攒到 33 行；`random_table` 是按这张表逐行取菜的，于是每行取一遍 | 0003 去重 + 补唯一索引，seed 补 `on conflict`。**教训：清理数据而重跑 seed 之前，先确认每条 insert 都有冲突兜底** |
 
 ## 37.1.2 网络可达性：实测结论（重要）
 
