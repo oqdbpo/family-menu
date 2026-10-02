@@ -315,6 +315,9 @@ td code{font-size:12px;color:var(--olive-deep);background:var(--surface-2);paddi
 .spicy i{width:9px;height:11px;display:block;background:var(--mustard);opacity:.22;
   clip-path:polygon(50% 0,78% 34%,100% 72%,74% 100%,26% 100%,0 72%,22% 34%)}
 .spicy i.on{opacity:1;background:var(--terracotta)}
+/* 难度改用橄榄色。必须排在 .spicy i.on 之后（同特异度靠顺序决胜），
+   选中与否靠 opacity .22 / 1 区分，不要给单个 i 写行内 style —— 行内样式会压掉 .on */
+.spicy.diff i{background:var(--olive)}
 
 /* 步进器 */
 .stepper{display:inline-flex;align-items:center;gap:2px;background:var(--surface-2);
@@ -1527,7 +1530,7 @@ pre .k{color:#C6C57E}pre .v{color:#DE8942}pre .c{color:#8A8C7C;font-style:italic
               <div style="flex:1"><div class="field" style="margin:0 0 5px"><label>辣度</label>
                 <span class="spicy"><i class="on"></i><i></i><i></i><i></i><i></i></span></div></div>
               <div style="flex:1"><div class="field" style="margin:0 0 5px"><label>难度</label>
-                <span class="spicy"><i class="on" style="background:var(--olive)"></i><i class="on" style="background:var(--olive)"></i><i style="background:var(--olive)"></i></span></div></div>
+                <span class="spicy diff"><i class="on"></i><i class="on"></i><i></i><i></i><i></i></span></div></div>
               <div style="flex:1"><div class="field" style="margin:0 0 5px"><label>制作时间</label>
                 <div style="display:flex;align-items:center;gap:5px;font-family:'Cascadia Code',Consolas,monospace;font-size:14px;font-weight:700;color:var(--olive-deep)">
                   10<span style="font-size:11px;color:var(--ink-3)">min</span></div></div></div>

@@ -172,6 +172,10 @@ button { font-family: inherit }
 .spicy i { width: 9px; height: 11px; display: block; background: var(--mustard); opacity: .22;
   clip-path: polygon(50% 0, 78% 34%, 100% 72%, 74% 100%, 26% 100%, 0 72%, 22% 34%) }
 .spicy i.on { opacity: 1; background: var(--terracotta) }
+/* 难度不用辣味的陶土色，改用橄榄。这条必须排在 .spicy i.on 之后：
+   两者特异度相同（0,2,1），只靠书写顺序决胜，写在前面选中态就会变回陶土色。
+   on / 非 on 的区分交给 .spicy i 的 opacity:.22 与 .spicy i.on 的 opacity:1 */
+.spicy.diff i { background: var(--olive) }
 
 .stepper { display: inline-flex; align-items: center; gap: 2px; background: var(--surface-2); border-radius: var(--r-pill); padding: 3px }
 .stepper button { width: 26px; height: 26px; border: 0; border-radius: var(--r-pill); background: var(--surface);

@@ -54,8 +54,8 @@
             <span class="spicy"><i v-for="n in 5" :key="n" :class="{ on: n <= form.spicy_level }"
               @click="form.spicy_level = n" style="cursor:pointer"></i></span></div></div>
           <div style="flex:1"><div class="field" style="margin:0 0 5px"><label>难度</label>
-            <span class="spicy"><i v-for="n in 5" :key="n" :class="{ on: n <= form.difficulty }"
-              @click="form.difficulty = n" style="cursor:pointer;opacity:.95;background:var(--olive)"></i></span></div></div>
+            <span class="spicy diff"><i v-for="n in 5" :key="n" :class="{ on: n <= form.difficulty }"
+              @click="form.difficulty = n" style="cursor:pointer"></i></span></div></div>
           <div style="flex:1"><div class="field" style="margin:0 0 5px"><label>时间</label>
             <input v-model.number="form.cooking_time" type="number" min="1" max="600" class="inp mono" style="height:32px;padding:0 8px">
           </div></div>
