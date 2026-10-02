@@ -1346,6 +1346,7 @@ supabase rpc random_table(people, meal_type)
 | Actions Secrets & Variables | `SB_ANON_KEY` `SB_MGMT_TOKEN`（Secrets）+ `SB_URL` `SB_PROJECT_REF`（Variables）全部写入 |
 | `design/_raw/` | **不进仓库**（17 MB 未处理原件，本地保留；`design/assets/` 才是产物） |
 | `src/` Vue 3 前端 | 6 个页面 + 加入家庭页，已连真实数据跑通；**未做视觉截图核对** |
+| `worker/` Supabase 反代 | **代码就绪、联调通过，等一个域名**。23 项逻辑自测全绿；真打上游验证过 5 条路径（见 37.9） |
 
 ## 37.6.1 仓库与凭据的当前约定
 
@@ -1412,11 +1413,49 @@ UI 上的表现：已确认的订单不再显示步进器和删除按钮，改�
 
 | 事项 | 说明 |
 |---|---|
-| 反代域名 | 见 37.1.2。**不做这步，app 只有装了代理的你自己能用** |
+| 反代域名 | 见 37.1.2 和 **37.9（代码和清单已就绪）**。**不做这步，app 只有装了代理的你自己能用** |
 | keep-alive 验证 | 推仓库、配 Secrets、手动 Run、开失败邮件通知 |
 | 视觉核对 | 内置浏览器面板当时不可见，6 个页面只做了结构化验证（DOM/数据/零报错），没截图比对设计稿 |
 | 深色纸底 | 目前只有浅色。真要做需重出一版插画，不能靠滤镜反色 |
 | 早餐 / 火锅独立页 | README 第 7、11 节的页面还没单独成页，目前靠 Order 页的分类切换覆盖 |
+
+## 37.9 境内可达性：反代层已备好，只差一个域名
+
+结论没变：`*.supabase.co` 境内被 SNI reset，而 Cloudflare 边缘境内可达。
+所以**唯一的堵点是"缺一个自己控制的域名的入口"**，不是方案本身错了。
+代码和清单已经写完，买完域名直接套。
+
+```text
+worker/src/index.js   反代本体。23 项自测全绿（node worker/selftest.mjs）
+worker/wrangler.toml  vars 与部署说明
+worker/部署清单.md    买域名 → 接 CF → 部署 → 绑域名 → 验证 → 切前端，8 步
+```
+
+**设计取舍**（改代码前先看这几条，都是踩过或查过的）：
+
+| 点 | 做法 | 为什么 |
+|---|---|---|
+| 路径白名单 | 只转发 `/rest/v1/` `/auth/v1/` `/storage/v1/`，其余 404 且**不回源** | 免得变成任意人往 Supabase 打请求的开放代理 |
+| 上游地址 | 由 `SUPABASE_PROJECT_REF` 拼死，不接受客户端影响 | 同上，白名单只限路径，ref 限死项目 |
+| `x-forwarded-for` | 删掉客户端伪造值，用 `cf-connecting-ip` 重建 | 不覆盖的话全家被算成同一个 CF 节点 IP，容易撞 GoTrue 限流 |
+| CORS | 预检本地 204 应答不回源；透传上游时**先剥掉上游的 `access-control-*`** 再自己发一份 | 上游那份也在，浏览器见到两个 `allow-origin` 直接判非法 |
+| credentials | 刻意不发 `access-control-allow-credentials` | supabase-js 走 Authorization 头不用 cookie；"反射任意来源 + allow-credentials"同时存在才是真漏洞 |
+| 边缘缓存 | 只有 `/storage/v1/object/public/` 加 `cacheTtl=86400`，接口和签名 URL 一律不缓存 | 免费额度只有 5GB/月出网；图片缓在 CF 边缘后全网只回源一次 |
+| 密钥 | 一个都不放 | anon/publishable key 本来就在前端包里，边界是 RLS 不是密钥 |
+
+**切换成本 = 改一个值**。GitHub Actions Variables 里 `SB_URL` 改成新域名，跑一次 `deploy-web`。
+代码侧本来就只有一个出口：`src/config.js` 读 `VITE_SB_URL`，`publicImageUrl()` 跟着它拼，
+`vite.config.js` 的 workbox 规则按它的 hostname 匹配，全都不用手改。
+本地开发对应加了 `supabase/.env.local` 的 `SB_PROXY_URL`（留空则回退直连），
+`tools/gen-env.mjs` 优先取它，两条分支实测都通。
+
+**两处不要跟着改**：`keepalive.yml` 和 `supabase/*.mjs` 继续直连 `*.supabase.co`——
+GitHub runner 和本机都在境外/有代理，直连更快，且少一层依赖。
+
+**风险提示（诚实版）**：CF 免费档是共享 IP，个别运营商线路上偶发被干扰。
+所以清单第 5 步要求先在**这台电脑**上 `curl --noproxy '*'` 测 `/healthz`，
+再用**手机移动网络**测一次——两个都通才继续。不通的退路按代价从低到高排在清单末尾，
+最坏一档（付费套餐拿独立 IP，¥160+/月）就不划算了，那时该重新评估微信云开发。
 
 
 ---

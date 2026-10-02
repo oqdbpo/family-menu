@@ -24,12 +24,16 @@ if (!s.SB_URL || !s.SB_ANON_KEY) {
   process.exit(1);
 }
 
+// 反代上线后把 SB_PROXY_URL 填上，本地开发就能不走系统代理直连；
+// 没填则维持原样。CI 那边对应的开关是 Actions Variables 里的 SB_URL。
+const url = s.SB_PROXY_URL || s.SB_URL;
+
 fs.writeFileSync(path.join(ROOT, '.env'),
   `# 由 tools/gen-env.mjs 生成，勿手改；要改请改 supabase/.env.local 后重跑\n` +
-  `VITE_SB_URL=${s.SB_URL}\n` +
+  `VITE_SB_URL=${url}\n` +
   `VITE_SB_ANON_KEY=${s.SB_ANON_KEY}\n` +
   `VITE_DEMO_INVITE=DEMO01\n`);
 
 console.log('.env 已生成');
-console.log('  VITE_SB_URL      =', s.SB_URL);
+console.log('  VITE_SB_URL      =', url, s.SB_PROXY_URL ? '（走反代）' : '（直连 supabase.co）');
 console.log('  VITE_SB_ANON_KEY =', s.SB_ANON_KEY.slice(0, 18) + '…');

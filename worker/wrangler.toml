@@ -1,0 +1,28 @@
+# Cloudflare Worker 配置。部署方式二选一：
+#   A. 控制台粘贴（推荐，零本地依赖）：Workers & Pages → Create → Worker → 把 src/index.js 粘进去 → Deploy
+#   B. CLI：npx wrangler login && npx wrangler deploy
+#
+# 免费档够用：10 万次请求/天，自定义域名绑定免费，这个 Worker 用量约为其零头。
+
+name = "family-menu-proxy"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+# 项目 ref 就是 https://<ref>.supabase.co 中间那 20 位，不是密钥（前端包里本来就有）
+[vars]
+SUPABASE_PROJECT_REF = "myawyxhhllvsdpqabnro"
+
+# 来源白名单，逗号分隔。留空 = 反射任意来源。
+# 只是防蹭，不是安全边界——真正的边界是 RLS，anon key 设计上就是公开的。
+# 如果以后把前端也从 Pages 挪到这个域名下，记得回来把新来源加上。
+ALLOWED_ORIGINS = "https://oqdbpo.github.io,http://localhost:5173,http://127.0.0.1:5173"
+
+# 自定义域名绑定：先在 Cloudflare 控制台把域名加进当前账号，
+# 再到 Workers → family-menu-proxy → Settings → Domains & Routes 里填，
+# Cloudflare 会自动建好 DNS 记录并开启代理（橙色云）。
+# 域名定下来后也可以让 wrangler 接管，把下面注释去掉：
+# routes = [
+#   { pattern = "menu.你的域名.com/*", zone_name = "你的域名.com" }
+# ]
+
+workers_dev = false
