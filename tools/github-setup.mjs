@@ -100,7 +100,7 @@ if (!existing.ok) {
 /* ---------- 2. 推送 ---------- */
 if (!SKIP_PUSH) {
   const clean = `https://github.com/${OWNER}/${REPO_NAME}.git`;
-  git(['remote', 'remove', 'origin']);
+  try { git(['remote', 'remove', 'origin']); } catch { /* 首次跑时 origin 还不存在，正常 */ }
   git(['remote', 'add', 'origin', clean]);
   try { git(['rev-parse', '--verify', 'HEAD']); } catch {
     console.error('\n还没有提交。先跑：\n  git commit -m "init"\n（需要 git 身份，见 README 或问我）');
