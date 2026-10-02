@@ -61,6 +61,7 @@ if (!URL || !KEY) {
 }
 
 let token = null;
+let uid = null;
 const results = [];
 function say(name, ok, detail = '') {
   results.push({ name, ok });
@@ -87,7 +88,7 @@ console.log(`\n目标 ${URL}\n${'─'.repeat(64)}`);
 try {
   const r = await call('/auth/v1/signup', { method: 'POST', body: { anonymous: true } });
   token = r.access_token;
-  const uid = r.user?.id;
+  uid = r.user?.id;
   say('匿名登录拿到 access_token', !!token, uid ? `uid ${uid.slice(0, 8)}…` : '');
   if (!token) throw new Error('响应里没有 access_token');
 } catch (e) {
@@ -193,6 +194,35 @@ if (WRITE_TEST) {
   }
 } else {
   console.log('  SKIP  确认点餐全链路（加 --write 开启，会往示范家庭写一条记录）');
+}
+
+// ---------- 8. 自清理：删掉本次用的匿名身份 ----------
+// 第 2 项检查的前提是"这个会话还没加入任何家庭"，所以每轮都必须新签一个身份，
+// 不能复用缓存 token。代价是不管的话，示范家庭里会一路堆陌生成员
+// （实测几轮下来攒了 4 个"新成员/自检设备"）。默认自己擦干净；
+// 想在 app 里以这个身份看现场，加 --keep-session。
+// auth.users 上 family_members 是 on delete cascade，删身份即连带删成员行。
+if (!process.argv.includes('--keep-session') && /^[0-9a-f-]{36}$/i.test(String(uid))) {
+  const REF = env.SB_PROJECT_REF, TOK = env.SB_MGMT_TOKEN;
+  if (!REF || !TOK) {
+    console.log('  SKIP  自清理（supabase/.env.local 缺 SB_PROJECT_REF / SB_MGMT_TOKEN）');
+    console.log(`        本次身份 uid ${uid.slice(0, 8)}… 留在示范家庭里了，需要的话手动删`);
+  } else {
+    try {
+      const r = await fetch(`https://api.supabase.com/v1/projects/${REF}/database/query`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${TOK}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: `delete from auth.users where id = '${uid}'::uuid;` }),
+      });
+      const t = await r.text();
+      if (!r.ok) throw new Error(`HTTP ${r.status} ${t.slice(0, 120)}`);
+      console.log(`        自清理：已删除本次身份 uid ${uid.slice(0, 8)}…（连带其成员行）`);
+    } catch (e) {
+      console.log(`  WARN  自清理失败，身份可能残留 —— ${e.message}`);
+    }
+  }
+} else if (uid) {
+  console.log(`  SKIP  自清理（--keep-session）—— uid ${uid.slice(0, 8)}…`);
 }
 
 // ---------- 汇总 ----------

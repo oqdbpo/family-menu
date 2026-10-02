@@ -1201,11 +1201,12 @@ PWA 手机体验优化
        真实字段名是 external_anonymous_users_enabled（不是文档暗示的 disable_anonymous_sign_ins）
 ③ node supabase/run-sql.mjs supabase/migrations/0001_init.sql
 ④ node supabase/run-sql.mjs supabase/migrations/0002_family_id_default.sql
+   node supabase/run-sql.mjs supabase/migrations/0003_table_plan_unique.sql
 ⑤ node supabase/run-sql.mjs supabase/seed.sql
 ⑥ 通知 PostgREST 重载 schema 缓存：
      notify pgrst, 'reload schema';
      ↑ 不做这步，/rest/v1/rpc/* 会返回 404 "requested path is invalid"
-⑦ node supabase/verify.mjs --write     10 项全绿才算通
+⑦ node supabase/verify.mjs --write     只读 6 项，加 --write 走写链路共 7 项，全绿才算通
 ⑧ 建 GitHub 仓库并推送，配 4 项 Actions Secrets/Variables，手动 Run 一次 workflow
 ```
 
@@ -1338,7 +1339,7 @@ supabase rpc random_table(people, meal_type)
 | `supabase/migrations/0002_family_id_default.sql` | 已执行 |
 | `supabase/seed.sql` | 已执行，30 道菜 + 11 条历史订单 |
 | Storage `dish-images` | 11 张菜品插画已上传并回填 `image_path`，剩 19 道待家人实拍 |
-| `supabase/verify.mjs` | 10 项全绿（含 RLS 隔离、随机权重、confirm 幂等） |
+| `supabase/verify.mjs` | 只读 6 项全绿；加 `--write` 走 confirm 链路共 7 项（含 RLS 隔离、随机权重、confirm 幂等）。**跑完自动删掉本次的匿名身份**，不再往示范家庭堆陌生成员；要看现场加 `--keep-session` |
 | `.github/workflows/keepalive.yml` | **已上线并跑通**：首次手动运行 `conclusion=success`，PostgREST 返回 200，心跳提交已由 `keepalive-bot` 推回仓库 |
 | GitHub 仓库 | `oqdbpo/family-menu`，**public**（Pages 免费档不支持私有库），main 分支 |
 | GitHub Pages | **已上线** `https://oqdbpo.github.io/family-menu/`；`deploy-web` run #1 success；强制直连实测首页 / manifest / sw.js / 图标 / JS 主包全部 200 |
