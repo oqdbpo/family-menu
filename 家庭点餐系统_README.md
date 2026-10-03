@@ -1206,6 +1206,7 @@ PWA 手机体验优化
    node supabase/run-sql.mjs supabase/migrations/0005_owner_transfer.sql
    node supabase/run-sql.mjs supabase/migrations/0006_seafood_ingredient.sql
    node supabase/run-sql.mjs supabase/migrations/0007_cancel_and_move_order.sql
+   node supabase/run-sql.mjs supabase/migrations/0008_more_ingredients.sql
 ⑤ node supabase/run-sql.mjs supabase/seed.sql
 ⑥ 通知 PostgREST 重载 schema 缓存：
      notify pgrst, 'reload schema';
@@ -1594,6 +1595,11 @@ npx vite                      # 终端 2
   **当前分区里真实被用到的**食材（代码注释原话：避免点进去是空列表）。
   所以新食材在录入页**立刻可选**，但要等至少一道菜用上它，才会出现在点菜的筛选条上。
 - `category_dict.sort` 是分段占号的：一级分类 1~6，火锅细分 301~。
+
+0008 又补了 `动物内脏`（肉类）——需求原话是"新增菜品时主食材里选得到这两样"。
+顺带记一个容易被当成 bug 的现状：**「主食材」下拉不按分类过滤**，选着荤菜也能看到
+蔬菜、豆腐。这是原设计（食材与分类是两个独立概念，原则一），不是漏写 filter。
+真要"选荤菜只给肉/水产/内脏"，得先定下那些边界菜（比如豆腐烧肉）归哪类。
   把新行塞成 `sort=2` 会撞号、把胶囊顺序打乱（第一版踩过，顺手顺延还会让
   火锅与汤挤成同一个 sort=4）。
 
