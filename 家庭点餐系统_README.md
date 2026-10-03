@@ -1242,7 +1242,12 @@ www.cloudflare.com                    200   ✓
 ```
 
 Cloudflare 本身通、Supabase 主站通、Management API 通，**只有 `*.supabase.co`
-被硬 reset** —— 这是针对该通配域名的 **SNI 级过滤**，不是 Cloudflare 的问题，也不是慢。
+被 reset** —— 这是针对该通配域名的 **SNI 级过滤**，不是 Cloudflare 的问题。
+
+⚠ 但别把它理解成"100% 不通"。两次测量：一次 21/21 全挂，一次 10 次里**通了 1 次**
+（那一次拿到 401，说明 TLS 握手和 HTTP 都完成了，只是没带 apikey）。
+也就是说它是**高概率失败、偶发成功**。这个区别很重要：家人会碰到"刚才还能用现在又连不上"，
+而一次成功很容易被误读成"其实没被墙，不用折腾反代"。判断口径用稳定可用，不是"能不能碰上一次"。
 
 影响范围：PostgREST、Auth、Storage 三条路全在 `*.supabase.co` 下，**全部不可直连**。
 开发机上靠本地代理绕过（`supabase/.env.local` 里配 `HTTPS_PROXY`，`verify.mjs`
