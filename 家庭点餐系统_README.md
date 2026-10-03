@@ -1204,7 +1204,7 @@ PWA 手机体验优化
    node supabase/run-sql.mjs supabase/migrations/0003_table_plan_unique.sql
    node supabase/run-sql.mjs supabase/migrations/0004_member_management.sql
    node supabase/run-sql.mjs supabase/migrations/0005_owner_transfer.sql
-   node supabase/run-sql.mjs supabase/migrations/0006_seafood_subcategory.sql
+   node supabase/run-sql.mjs supabase/migrations/0006_seafood_ingredient.sql
    node supabase/run-sql.mjs supabase/migrations/0007_cancel_and_move_order.sql
 ⑤ node supabase/run-sql.mjs supabase/seed.sql
 ⑥ 通知 PostgREST 重载 schema 缓存：
@@ -1571,22 +1571,31 @@ npx vite                      # 终端 2
 ``dispatchEvent(new CustomEvent(`vite:preloadError`,{cancelable:!0}))``，
 且路由的每个 `import('./Xxx.js')` 都过这个包装器。不是照着记忆写的 API。
 
-## 37.12 加一个分类 = 插一行（0006 的其他海鲜）
+## 37.12 「其他海鲜」：先搞清它是食材还是分类（0006）
 
-「荤菜下加其他海鲜，录入时可选、点菜时可筛」——**零代码改动**，只插了一行
-`category_dict`。因为两端都是现读字典表：`DishForm.vue` 的细分胶囊按
-`meal_type + category` 过滤出非空 `subcategory`，`Order.vue` 同理，
-`stores/dishes.js` 按 `d.subcategory` 筛。这正是第 33.2 节
-「数据驱动 UI，不写死在前端」要的样子。
+需求原话是"荤菜中增加一个其他海鲜，录入时可选、点菜时可筛"。第一版把它当成
+`category_dict` 里荤菜的**细分**，而且实测真的能用（点菜页荤菜 11 道 → 点其他海鲜 → 2 道）
+——那是**答对了一个错问题**。「其他海鲜」说的是这条菜用什么料，不是它算哪一类，
+正好违反本项目原则一「分类与食材分离」（西红柿炒鸡蛋归素菜、食材仍记鸡蛋）。
+被指出后改成往 `ingredients` 加一行 `(name='其他海鲜', kind='水产')`。
 
-实测：点菜页荤菜 11 道 → 点「其他海鲜」→ 2 道（清蒸鲈鱼、白灼虾），
-下面的做法条也自动只剩这 2 道用得到的（蒸、煮）；录入页细分胶囊变成
-`不限 / 其他海鲜`。
+教训：**"能跑通"不等于"放对了地方"**。数据模型放错表，功能越好用越难发现，
+所以动手前先问一句"这个词属于哪张表"。
 
-`sort` 各占一段号，别乱塞：一级分类 1~6，火锅细分 301~，荤菜细分从 101 起。
-第一次写的时候把「其他海鲜」放成 sort=2 并顺手顺延了素菜/火锅，
-结果 火锅 和 汤 挤成同一个 sort=4，把分类胶囊的顺序打乱了——已回退。
+0006 是被**重写过**的，而且没有追加一条 0008 去撤销它：文件自己先 delete 掉那条放错的细分、
+把被它打标的菜 subcategory 归空，再 insert 食材。这样"对已经跑过旧版的库"和"从零新装"
+落到同一个结果，不必维护两步互相抵消的历史。改完核对：水产 = 其他海鲜、虾、螃蟹、鱼；
+荤菜下已无细分；仍标着「其他海鲜」细分的菜 0 道；清蒸鲈鱼的细分回到空。
 
+两条仍然成立的结论：
+
+- 加一个可选项 = 插一行，前端零改动。录入页「主食材」下拉直接读 `ingredients`；
+  点菜页的食材条来自 `stores/dishes.js` 的 `ingredients` computed，它只统计
+  **当前分区里真实被用到的**食材（代码注释原话：避免点进去是空列表）。
+  所以新食材在录入页**立刻可选**，但要等至少一道菜用上它，才会出现在点菜的筛选条上。
+- `category_dict.sort` 是分段占号的：一级分类 1~6，火锅细分 301~。
+  把新行塞成 `sort=2` 会撞号、把胶囊顺序打乱（第一版踩过，顺手顺延还会让
+  火锅与汤挤成同一个 sort=4）。
 
 ## 37.13 取消已确认的一顿，以及挪餐次/日期（0007）
 
