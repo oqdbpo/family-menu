@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="wordmark" style="padding-top:44px">
-      <div class="en">今天吃什么</div>
+      <div class="en">米粒爱吃饭</div>
       <div class="sub">a lazy day in the family kitchen</div>
     </div>
     <img :src="hero" alt="" style="width:250px;margin:6px auto 0">

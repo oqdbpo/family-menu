@@ -20,8 +20,8 @@ export default defineConfig(({ mode }) => {
           // Pages 部署在 /family-menu/ 子路径下，这里必须用相对值。
           // 写成 '/' 会让 PWA 启动时跳到仓库根目录，白屏
           id: './',
-          name: '家庭点餐系统',
-          short_name: '今天吃什么',
+          name: '米粒爱吃饭',
+          short_name: '米粒爱吃饭',
           description: '家庭内部使用的轻量点餐与菜品管理',
           lang: 'zh-CN',
           display: 'standalone',

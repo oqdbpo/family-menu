@@ -70,6 +70,17 @@ export async function vote(dishId, pref) {
   }, { label: '投票' });
 }
 
+// 我在自家菜库里的全部口味票，一次拉回来做成 { 菜id: -1|0|1 }。
+// 今日点餐一桌十几道，逐道去查会变成十几次请求
+export async function myTasteMap() {
+  const me = await currentMemberId();
+  if (!me) return {};
+  const { data, error } = await sb.from('member_dish_preferences')
+    .select('dish_id,pref').eq('member_id', me);
+  if (error) throw error;
+  return Object.fromEntries((data || []).map(r => [r.dish_id, r.pref]));
+}
+
 let memberCache = null;
 export async function currentMemberId() {
   if (memberCache) return memberCache;

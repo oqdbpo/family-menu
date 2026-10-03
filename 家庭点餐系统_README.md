@@ -1358,6 +1358,7 @@ supabase rpc random_table(people, meal_type)
 | Actions Secrets & Variables | `SB_ANON_KEY` `SB_MGMT_TOKEN`（Secrets）+ `SB_URL` `SB_PROJECT_REF`（Variables）全部写入 |
 | `design/_raw/` | **不进仓库**（17 MB 未处理原件，本地保留；`design/assets/` 才是产物） |
 | `src/` Vue 3 前端 | 7 个页面（含新增的家庭成员页）+ 加入家庭页，已连真实数据跑通 |
+| 应用名 | 已改为 **米粒爱吃饭**（首页 + 加入页抬头 + 标签页标题 + PWA 图标名四处一起，见 37.14） |
 | `migrations/0004`～`0006` + 成员管理页 | **已在真机点过一遍**：浏览器里移除示范成员、交出管理员、试图移除现任管理员被数据库拒绝 → 每步都回读数据库核对 → 恢复到 seed 状态。见 37.10 |
 | 「我的」点不进去 | **已修**：部署后旧 chunk 文件名 404，部署前打开的标签页点懒加载路由就没反应。`src/main.js` 接 `vite:preloadError` 重载一次。见 37.11 |
 | 清理脚本 | `cleanup-test-members.sql`（自检遗留成员）、`cleanup-orphan-identities.sql`（无主匿名身份，实测清掉 9 个） |
@@ -1666,6 +1667,34 @@ refresh_family_stats(uuid)     内部 helper，anon/authenticated 无执行权
 
 
 ---
+
+## 37.14 改名「米粒爱吃饭」，口味票改成逐道菜直接标
+
+**改名要动四处**，只改首页会留下不一致（上一轮我把这四行列给用户时就是这么说的）：
+`Home.vue` 抬头、`Join.vue` 抬头、`index.html` 的 `<title>`、
+`vite.config.js` 的 manifest `name` + `short_name`（后者是**装到手机桌面时显示的名字**）。
+`design/preview.html` 里那三处只是设计稿，不影响线上。
+标题字号写死 34px 且没有换行保护（`ui.css` 的 `.wordmark .en`），五个字还放得下，
+再加字就得调字号。
+
+**口味票从"一张卡选一道"改成"每道菜下面一排小圆钮"**：原来的评价卡只针对
+`order.items[0]`，一桌十几道菜要逐道标就得反复切菜，纯噪音。现在 `.taste` 三个 24px 圆钮
+（偏好 ♥ / 一般 leaf / 忌口 ×）就在菜名和标签下面，点谁标谁。
+
+| 位置 | 做法 |
+|---|---|
+| 组件 | `DishCard.vue` 新增 `canVote` + `myVote` 两个 prop，emit `vote`。只有今日点餐传 `can-vote`，点餐页的列表不显示票钮，布局不受影响 |
+| 文案 | 用你说的 **偏好 / 一般 / 忌口**，不再是原来的"喜欢 / 不喜欢"。忌口和不喜欢不是一回事，前者是"家里有成员不能吃" |
+| 取数 | `myTasteMap()` 一次拉回我在全家的全部票做成 `{菜id: -1|0|1}`。原先是逐道菜各查一次，一桌就是十几次请求 |
+| 交互 | 先改本地再发请求（饭桌上连点要立刻有反馈）；写失败**把图标退回去**，不留"看着标上了其实没入库"的状态 |
+| 样式 | 选中态靠底色区分（mauve/olive/terracotta 三种 wash），不靠透明度——24px 的圆点上那点差别看不见 |
+
+⚠ `pref = 0` 是"一般"这个**有效值**，不是"没投过"。所以取值一律 `taste[id] ?? null`，
+写成 `||` 或真值判断会把"一般"当成没标过。这是这轮最容易埋进去的 bug。
+
+验证状态：**构建产物核对过**（标题四处、`.taste` 类与样式、旧评价卡文案已消失、
+仍写 `member_dish_preferences`），但**没有端到端点击验证** —— 当时本机代理没监听、
+Supabase 直连 5 次只通 1 次，页面进不去。
 
 ## 项目核心原则
 

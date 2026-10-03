@@ -145,6 +145,15 @@ button { font-family: inherit }
 .dish .nm b { font-size: 15px; font-weight: 800; letter-spacing: -.2px }
 .dish .meta { font-size: 11.5px; color: var(--ink-3); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
 .dish .tags { display: flex; gap: 5px; margin-top: 6px; flex-wrap: wrap }
+/* 今日点餐里每道菜下面的口味票。24px 是手机上还能按得准的下限；
+   选中态靠底色区分，不靠透明度——三个圆点本身已经很小了 */
+.taste { display: flex; gap: 5px; margin-top: 7px }
+.taste button { width: 24px; height: 24px; border: 0; border-radius: 50%; padding: 0; cursor: pointer;
+  display: grid; place-items: center; background: var(--surface-2); color: var(--ink-3) }
+.taste button svg { width: 13px; height: 13px }
+.taste button.like.on { background: var(--mauve-wash); color: #6E4D69 }
+.taste button.meh.on { background: var(--olive-wash); color: var(--olive-deep) }
+.taste button.no.on { background: var(--terracotta-wash); color: var(--danger) }
 .dish .rt { display: flex; flex-direction: column; align-items: center; gap: 7px; flex: 0 0 auto }
 .add { width: 32px; height: 32px; border: 0; border-radius: var(--r-pill); background: var(--olive);
   display: grid; place-items: center; cursor: pointer; box-shadow: 0 3px 9px rgba(142,147,72,.34);

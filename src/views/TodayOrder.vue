@@ -61,6 +61,7 @@
         <div class="pad">
           <DishCard v-for="i in g.items" :key="i.dish_id" :dish="i.dish" :qty="i.quantity"
                     :readonly="order.locked" :locked="order.locked"
+                    can-vote :my-vote="tasteOf(i.dish_id)" @vote="p => cast(i.dish, p)"
                     @inc="order.setQty(i.dish, i.quantity + 1)" @dec="order.setQty(i.dish, i.quantity - 1)"
                     @add="order.setQty(i.dish, i.quantity + 1)" @remove="order.setQty(i.dish, 0)" />
         </div>
@@ -94,17 +95,6 @@
         </button>
       </div>
 
-      <div class="pad" style="margin-top:20px">
-        <div class="card" style="padding:14px 16px">
-          <div style="font-size:12.5px;font-weight:700;margin-bottom:10px">我对「{{ voteDishName }}」的评价</div>
-          <div class="chips">
-            <button v-for="v in votes" :key="v.p" class="chip" :class="{ on: myVote === v.p }" @click="cast(v.p)">
-              <Ic :name="v.icon" :size="14" />{{ v.label }}
-            </button>
-          </div>
-          <div class="hint" style="margin-top:9px">投票进 member_dish_preferences，随机时按全家偏好加权</div>
-        </div>
-      </div>
       <div class="hand" style="text-align:center;font-size:16px;padding:16px 0 4px">{{ greeting }}</div>
     </template>
 
@@ -132,13 +122,16 @@ import StateBlock from '../components/StateBlock.vue';
 import { useSessionStore } from '../stores/session';
 import { useOrderStore } from '../stores/orders';
 import { MEAL_TYPES, todayISO } from '../services/orders';
-import { vote, currentMemberId } from '../services/family';
+import { vote, myTasteMap } from '../services/family';
 import emptyArt from '../assets/img/hero-empty.png';
 
 const session = useSessionStore();
 const order = useOrderStore();
 const busy = ref(false);
-const myVote = ref(null);
+// 我的口味票：{ 菜id: -1|0|1 }。pref=0 是"一般"这个有效值而不是"没投过"，
+// 所以取值一律用 ?? 判断，不能用 || 或真值判断
+const taste = ref({});
+const tasteOf = id => taste.value[id] ?? null;
 
 const mealTypes = MEAL_TYPES;
 const todayStr = todayISO();
@@ -168,11 +161,9 @@ const groups = computed(() => {
   return [...m.entries()].sort((a, b) => ORDER.indexOf(a[0]) - ORDER.indexOf(b[0])).map(([name, items]) => ({ name, items }));
 });
 
-const votes = [{ p: 1, label: '喜欢', icon: 'heart' }, { p: 0, label: '一般', icon: 'leaf' }, { p: -1, label: '不喜欢', icon: 'x' }];
 const notice = ref('');
 const armed = ref(false);
 let armTimer = null;
-const voteDishName = computed(() => order.items[0]?.dish?.name || '这道菜');
 
 // 两段式确认：清空是可撤销成本最低但最容易误触的操作，不值得弹模态
 async function clear() {
@@ -235,23 +226,24 @@ async function doMove() {
                           : `已挪到 ${toDate.value} · ${toMeal.value}`;
 }
 
-async function cast(p) {
-  const dish = order.items[0]?.dish;
-  if (!dish) return;
-  myVote.value = p;
+async function cast(dish, p) {
+  const prev = taste.value[dish.id] ?? null;
+  // 先改本地再发请求：饭桌上手指连点好几道，等请求回来才亮会让人觉得没点上
+  taste.value = { ...taste.value, [dish.id]: p };
+  notice.value = '';
   const r = await vote(dish.id, p);
-  if (r.error) notice.value = r.error.message || String(r.error);
-  else if (r.queued) notice.value = '投票已存在本机，联网后自动提交';
+  if (r.error) {
+    // 写失败就把图标退回原样，别留一个"看着标上了其实没进库"的状态
+    taste.value = { ...taste.value, [dish.id]: prev };
+    notice.value = r.error.message || String(r.error);
+  } else if (r.queued) {
+    notice.value = `「${dish.name}」的口味已存在本机，联网后自动上传`;
+  }
 }
 
 onMounted(async () => {
   await order.load();
-  const me = await currentMemberId().catch(() => null);
-  if (me && order.items[0]) {
-    const { sb } = await import('../lib/supabase');
-    const { data } = await sb.from('member_dish_preferences').select('pref')
-      .eq('member_id', me).eq('dish_id', order.items[0].dish_id).maybeSingle();
-    myVote.value = data?.pref ?? null;
-  }
+  // 一次把全家的票拉成 map，而不是逐道菜各查一次
+  taste.value = await myTasteMap().catch(() => ({}));
 });
 </script>
