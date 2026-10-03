@@ -62,7 +62,7 @@
         </div>
 
         <div class="field">
-          <label>做法说明<em>description · 怎么做</em></label>
+          <label>备注说明<em>description · 怎么做</em></label>
           <textarea v-model="form.description" class="ta" rows="3"
                     placeholder="土豆切块、鸡胸肉切块，腌肉 15 分钟，烤箱 200° 20 分钟。可以留空。"></textarea>
           <div class="hint" style="margin-top:5px">做饭时瞄的就是这几行，写"先干什么再干什么"而不是写感想</div>

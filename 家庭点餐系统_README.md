@@ -1701,7 +1701,11 @@ refresh_family_stats(uuid)     内部 helper，anon/authenticated 无执行权
 仍写 `member_dish_preferences`），但**没有端到端点击验证** —— 当时本机代理没监听、
 Supabase 直连 5 次只通 1 次，页面进不去。
 
-## 37.15 「做法说明」：先查库，发现字段早就有了
+## 37.15 「备注说明」：先查库，发现字段早就有了
+
+> 界面标签一开始叫「做法说明」，后按用词习惯改成**备注说明**。库里字段仍是
+> `dishes.description`，代码内部的 prop 仍叫 `showSteps`（它描述的是"摊开做法"这件事，
+> 不是标签文案）。改的只有给用户看的那一行字。
 
 需求是"新增菜品时能写这道菜怎么做"。结果一查：`dishes.description` **从 0001 就存在**
 （text、可空），而且读取（`DISH_SELECT`）、保存（`saveDish` 的 row）、搜索

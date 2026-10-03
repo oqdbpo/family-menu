@@ -327,13 +327,14 @@ button { font-family: inherit }
 .inp { width: 100%; height: 44px; border: 0; border-radius: var(--r-md); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); padding: 0 14px; font-size: 14px; font-family: inherit; color: var(--ink) }
 .inp::placeholder { color: var(--ink-3) }
 .inp:focus { outline: none; box-shadow: inset 0 0 0 1.5px var(--olive) }
-/* 多行输入（做法说明）。高度写死会遮住键盘，所以给 min-height + 允许竖向拉伸 */
+/* 多行输入（备注说明）。高度写死会遮住键盘，所以给 min-height + 允许竖向拉伸 */
 .ta { width: 100%; min-height: 74px; border: 0; border-radius: var(--r-md); background: var(--surface-2);
   box-shadow: inset 0 0 0 1px var(--line); padding: 10px 14px; font-size: 13.5px; font-family: inherit;
   line-height: 1.6; color: var(--ink); resize: vertical }
 .ta::placeholder { color: var(--ink-3) }
 .ta:focus { outline: none; box-shadow: inset 0 0 0 1.5px var(--olive) }
-/* 菜的做法说明。写成人眼会跳过的正文尺寸反而更好读，因为做饭时是瞄一眼 */
+/* 菜的做法（存在 description 里，界面上叫备注说明）。写成人眼会跳过的正文尺寸反而
+   更好读，因为做饭时是瞄一眼 */
 .steps { margin-top: 7px; background: var(--surface-2); border-radius: var(--r-sm); padding: 7px 10px;
   font-size: 12px; line-height: 1.65; color: var(--ink-2); white-space: pre-wrap }
 .sel { position: relative }
