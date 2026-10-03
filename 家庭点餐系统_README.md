@@ -1280,8 +1280,13 @@ Cloudflare 本身通、Supabase 主站通、Management API 通，**只有 `*.sup
         家庭项目两个月没人 commit 太正常了，不处理就是保险丝自己烧了。
 ```
 
-任何一步失败都会让 workflow 标红。**务必在 GitHub 个人设置里打开 workflow failure
+任何一步失败都会让 workflow 标红。**必须在 GitHub 个人设置里打开 workflow failure
 邮件通知**，否则这套告警等于零——你不会主动去看 Actions。
+
+> 2026-10-03 已确认开着。注意 GitHub 改版后**已经没有叫 "Workflow failures" 的复选框**了，
+> 别按老路径找：现在的入口是 `Settings → Notifications → System → Actions`，
+> 显示成一个摘要按钮 `Notify me: Email. (Failed workflows only)` —— 括号里那句就是这一档。
+> 收件邮箱看页面顶部 "Default notifications email"。
 
 ## 37.3 图片规则
 
@@ -1440,8 +1445,8 @@ UI 上的表现：已确认的订单不再显示步进器和删除按钮，改�
 | 事项 | 说明 |
 |---|---|
 | 反代域名 | 见 37.1.2 和 **37.9（代码和清单已就绪）**。**不做这步，app 只有装了代理的你自己能用** |
-| keep-alive 验证 | 推仓库、配 Secrets、手动 Run、开失败邮件通知 |
-| 视觉核对 | 内置浏览器面板当时不可见，6 个页面只做了结构化验证（DOM/数据/零报错），没截图比对设计稿 |
+| keep-alive 验证 | ✅ 已闭环：3 次 run（#1 手动激活，#2 #3 定时触发）全 success，心跳提交由 `keepalive-bot` 写回过，失败邮件通知也确认开着。**唯一没被真实执行过的是 restore 分支**——项目至今没暂停过 |
+| 视觉核对 | 6 个页面只做过结构化验证。现在可以用 `tools/dev-tunnel.mjs` 起真数据在浏览器里逐页截图比对了（见 37.10.1），还没做 |
 | 深色纸底 | 目前只有浅色。真要做需重出一版插画，不能靠滤镜反色 |
 | 早餐 / 火锅独立页 | README 第 7、11 节的页面还没单独成页，目前靠 Order 页的分类切换覆盖 |
 
