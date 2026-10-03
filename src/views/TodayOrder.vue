@@ -61,7 +61,7 @@
         <div class="pad">
           <DishCard v-for="i in g.items" :key="i.dish_id" :dish="i.dish" :qty="i.quantity"
                     :readonly="order.locked" :locked="order.locked"
-                    can-vote :my-vote="tasteOf(i.dish_id)" @vote="p => cast(i.dish, p)"
+                    can-vote show-steps :my-vote="tasteOf(i.dish_id)" @vote="p => cast(i.dish, p)"
                     @inc="order.setQty(i.dish, i.quantity + 1)" @dec="order.setQty(i.dish, i.quantity - 1)"
                     @add="order.setQty(i.dish, i.quantity + 1)" @remove="order.setQty(i.dish, 0)" />
         </div>

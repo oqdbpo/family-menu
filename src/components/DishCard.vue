@@ -11,6 +11,9 @@
         <span v-for="t in dish.tags.slice(0, 3)" :key="t.name" :class="tagClass(t)">{{ t.name }}</span>
         <span v-if="stale" class="tag off">{{ stale }} 天没吃</span>
       </div>
+      <!-- 做法说明。只在真正照着做的地方给（今日点餐），菜库列表不给，
+           否则一屏全是大段文字，反倒看不出哪道是哪道 -->
+      <div v-if="showSteps && dish.description" class="steps">{{ dish.description }}</div>
       <!-- 口味票直接跟在菜名下面，不再单独做一张评价卡：
            今日点餐里一桌十几道，逐道都要能标，集中一张卡就得先选菜再滚回去标 -->
       <div v-if="canVote" class="taste" role="group" :aria-label="`这道菜在我家的口味`">
@@ -54,6 +57,7 @@ const props = defineProps({
   locked: Boolean,          // 这一餐已确认，加号只看不点
   readonly: Boolean,        // 已确认的订单：显示 ×N 而不是编辑控件
   canVote: Boolean,         // 今日点餐页才给口味票
+  showSteps: Boolean,       // 今日点餐页才摊开做法说明
   myVote: { type: Number, default: null },   // -1 / 0 / 1，null = 还没标过
 });
 defineEmits(['add', 'inc', 'dec', 'remove', 'vote']);

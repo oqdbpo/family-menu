@@ -62,6 +62,13 @@
         </div>
 
         <div class="field">
+          <label>做法说明<em>description · 怎么做</em></label>
+          <textarea v-model="form.description" class="ta" rows="3"
+                    placeholder="土豆切块、鸡胸肉切块，腌肉 15 分钟，烤箱 200° 20 分钟。可以留空。"></textarea>
+          <div class="hint" style="margin-top:5px">做饭时瞄的就是这几行，写"先干什么再干什么"而不是写感想</div>
+        </div>
+
+        <div class="field">
           <label>图片<em>image_path · 本机压到 ≤200KB 再传</em></label>
           <div class="upl">
             <DishThumb v-if="form.image_path" :path="form.image_path" />
@@ -108,7 +115,7 @@ const dicts = computed(() => session.dicts || { ingredients: [], methods: [], ta
 const mealTypes = ['正餐', '早餐'];
 
 const blank = () => ({ id: null, name: '', meal_type: '正餐', category: '荤菜', subcategory: '',
-  ingredient_id: null, cooking_method_id: null, image_path: '', spicy_level: 0, difficulty: 1,
+  ingredient_id: null, cooking_method_id: null, image_path: '', description: '', spicy_level: 0, difficulty: 1,
   cooking_time: 15, is_favorite: false, is_active: true });
 
 const form = reactive(blank());
@@ -138,6 +145,7 @@ watch(() => [props.modelValue, props.dish], () => {
     ingredient_id: props.dish.ingredient_id ?? null,
     cooking_method_id: props.dish.cooking_method_id ?? null,
     image_path: props.dish.image_path || '',
+    description: props.dish.description || '',   // 库里是 null，textarea 绑 null 容易出 "null"
   } : {});
   tagIds.value = (props.dish?.tags || []).map(t => dicts.value.tags.find(x => x.name === t.name)?.id).filter(Boolean);
 }, { immediate: true });

@@ -1696,6 +1696,34 @@ refresh_family_stats(uuid)     内部 helper，anon/authenticated 无执行权
 仍写 `member_dish_preferences`），但**没有端到端点击验证** —— 当时本机代理没监听、
 Supabase 直连 5 次只通 1 次，页面进不去。
 
+## 37.15 「做法说明」：先查库，发现字段早就有了
+
+需求是"新增菜品时能写这道菜怎么做"。结果一查：`dishes.description` **从 0001 就存在**
+（text、可空），而且读取（`DISH_SELECT`）、保存（`saveDish` 的 row）、搜索
+（`stores/dishes.js` 搜的是 `name + description`，点餐页那句占位符"搜菜名、备注"就是它）
+**三条线全都接上了，唯一缺的是 `DishForm.vue` 没给输入口。**
+
+所以这次只加了一个 textarea。要是上来就建 0009 加一列 `note`，就又造了一个双真相源
+（同 §37.10.2 的 owner_uid/role、§37.11 的增量 vs 重算）。
+**加字段之前先 grep 一遍表结构和 services 层**，这条比"写得快"重要。
+
+| 改动 | 说明 |
+|---|---|
+| `DishForm.vue` | 图片前面插一个多行输入绑 `form.description`，占位符直接给"土豆切块…烤箱 200° 20 分钟"，让写字的人知道该写到什么粒度 |
+| `ui.css` | 新增 `.ta`（textarea）和 `.steps`（显示）。textarea 用 `min-height` + `resize:vertical`——写死高度会被手机键盘挡住 |
+| `DishCard.vue` | 加 `showSteps` prop，开了才摊开 |
+| `TodayOrder.vue` | 传 `show-steps`：**只有今日点餐显示做法**，菜库列表不显示 |
+
+为什么不到处显示：一屏都是段落文字就看不出哪道是哪道了。做饭时瞄那一眼发生在今日点餐，
+所以放那儿。`.steps` 用 `white-space: pre-wrap`，人写的换行照原样保留。
+
+⚠ 库里 `description` 是 nullable。回填表单必须 `props.dish.description || ''`——
+把 `null` 直接绑到 textarea 上，`v-model` 后续拼串容易变成字面量 "null"。
+跟 §37.14 那个 `pref = 0` 是同一类坑：**"空值"和"没填"在数据上是两回事**。
+
+验证：构建产物核对过（输入项、占位符、`.ta` / `.steps` 样式、`description` 仍在保存 payload 里）。
+同样**没做端到端点击**——本机代理仍未监听、Supabase 直连 5 次只通 1 次。
+
 ## 项目核心原则
 
 > **简单、免费、移动端优先、数据驱动、业务与界面分离、为多端扩展预留空间。**
