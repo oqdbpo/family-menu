@@ -53,8 +53,8 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue';
-import { useRoute } from 'vue-router';
+import { computed, onMounted, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import AppSprite from './components/AppSprite.vue';
 import TabBar from './components/TabBar.vue';
 import StateBlock from './components/StateBlock.vue';
@@ -68,6 +68,11 @@ import { startSync, syncNow } from './lib/sync';
 const configured = isConfigured;
 const session = useSessionStore();
 const route = useRoute();
+const router = useRouter();
+
+// 被别的设备顶掉（0009：一个名字同一时间只认一台）时，store 会把这个旗举起来。
+// 留在原地只会看到一片空数据和一条条被拒的写操作，直接送回加入页点一次自己的名字
+watch(() => session.evicted, gone => { if (gone) router.replace('/join'); });
 
 const chrome = computed(() => (configured ? route.meta.chrome || 'tab' : 'none'));
 // navigator.onLine 为真但请求全失败 = 被网络中间层挡了，而不是设备断网

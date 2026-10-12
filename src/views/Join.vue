@@ -15,8 +15,19 @@
             <label>家庭邀请码 <i>*</i></label>
             <input v-model="code" class="inp mono" placeholder="6 位字母" maxlength="8" autocapitalize="characters">
           </div>
+
+          <!-- 名字即身份：填对邀请码就把这家的人列出来，点一下=认领原来那条成员行。
+               手打的风险很实在——多一个空格就是"另一个人"，口味票和订单接不回来 -->
+          <div class="field" v-if="roster.length">
+            <label>我是谁 <em>点名字，别再手打</em></label>
+            <div class="chips">
+              <button v-for="r in roster" :key="r.name" class="chip" :class="{ on: myName === r.name }"
+                      @click="pick(r.name)">{{ r.name }}</button>
+            </div>
+          </div>
+
           <div class="field">
-            <label>我是</label>
+            <label>我是<span v-if="!roster.length"> <i>*</i></span></label>
             <input v-model="myName" class="inp" placeholder="爸爸 / 妈妈 / 孩子" maxlength="12">
           </div>
           <button class="btn p blk" :disabled="busy" @click="doJoin">
@@ -25,6 +36,13 @@
           <button v-if="demo" class="btn o blk" style="margin-top:10px" @click="code = demo; doJoin()">
             用示范家庭 {{ demo }} 先看看
           </button>
+
+          <div v-if="session.evicted" class="banner warn" style="margin-top:14px">
+            <Ic name="leaf" :size="16" />
+            <div><b>这个称呼被另一台设备拿走了</b>
+              一个名字同一时间只认一台设备。在下面点一次自己的名字就能拿回来，
+              偏好和点过的菜一条都不会少。</div>
+          </div>
         </template>
 
         <template v-else>
@@ -56,33 +74,49 @@
       </div>
 
       <p class="hint" style="text-align:center;margin-top:20px;line-height:1.9">
-        不需要注册账号，每台设备各算一个成员<br>
-        清掉浏览器数据后要用邀请码重新进一次
+        不需要注册账号，也不用设密码<br>
+        换手机、清过数据、开无痕，只要邀请码没变、名字点对了，<br>
+        口味票和点过的菜都会接回同一个人身上<br>
+        <span style="color:#A85F26">所以这个邀请码请不要发到家庭群以外</span>
       </p>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import Seg from '../components/Seg.vue';
 import Ic from '../components/Ic.vue';
 import { useSessionStore } from '../stores/session';
+import { familyRoster } from '../services/family';
 import { DEMO_INVITE } from '../config';
 import hero from '../assets/img/hero-home.png';
 
 const router = useRouter();
 const session = useSessionStore();
 
-const mode = ref(session.members.length ? 'join' : 'create');
+// 刚被别的设备顶掉时不能默认给"新建家庭"——那会让人以为要重新建一个家，
+// 而正确动作就是再点一次自己的名字
+const mode = ref(session.evicted || session.members.length ? 'join' : 'create');
 const code = ref('');
 const myName = ref('');
 const familyName = ref('');
+const roster = ref([]);
 const busy = ref(false);
 const err = ref('');
 const created = ref('');
 const demo = DEMO_INVITE;
+
+// 邀请码固定 6 位，凑齐才去问名单 —— 少一位都是注定查不到，别白发请求
+watch(code, async v => {
+  const c = v.trim().toUpperCase();
+  if (c.length !== 6) { roster.value = []; return; }
+  const got = await familyRoster(c).catch(() => []);   // 拿不到名单不拦人，手打名字照样能进
+  if (code.value.trim().toUpperCase() === c) roster.value = got;
+});
+
+function pick(name) { myName.value = name; err.value = ''; }
 
 async function doJoin() {
   err.value = '';

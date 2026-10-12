@@ -12,6 +12,8 @@ export const useSessionStore = defineStore('session', () => {
   const error = ref(null);          // 'offline' | 'auth' | 'error' | null
   const family = ref(null);
   const members = ref([]);
+  // 本机被别的设备顶掉过一次，用于在加入页解释"为什么我被赶出来了"
+  const evicted = ref(false);
   const dicts = ref(null);
   const online = ref(typeof navigator === 'undefined' ? true : navigator.onLine);
 
@@ -59,7 +61,8 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   async function join(code, myName) {
-    await joinFamily(code, myName);
+    await joinFamily(code, myName);   // 里面会作废成员缓存：认领到了哪一行只有数据库知道
+    evicted.value = false;
     family.value = await myFamily();
     members.value = await listMembers();
     dicts.value = await loadDicts();
@@ -72,7 +75,20 @@ export const useSessionStore = defineStore('session', () => {
   // 成员管理页改过人之后，首页徽章和「我的」卡片上的人数要跟着变
   async function reloadMembers() {
     if (!family.value) return;
-    members.value = await listMembers();
+    const rows = await listMembers();
+    // 一个名字同一时间只认一台设备（0009）。家里另一台手机点了同一个名字，本机就被顶下来，
+    // RLS 于是把整个家藏起来 —— 名单空但家庭还在 = 我们已经不是这个家的人了。
+    // 不处理的话页面会继续显示旧数据、写操作一条条被拒，看起来像"坏了"
+    if (!rows.length) { dropFamily(); return; }
+    members.value = rows;
+  }
+
+  // 清掉本机身份，让路由把关把人送回加入页；留在原地只会一直读缓存
+  function dropFamily() {
+    family.value = null;
+    members.value = [];
+    resetMemberCache();
+    evicted.value = true;
   }
 
   // 成员名单是这台设备上「家里还剩谁」的唯一依据：别的设备加入或被移除，人数徽章
@@ -90,6 +106,6 @@ export const useSessionStore = defineStore('session', () => {
     window.addEventListener('offline', () => { online.value = false; });
   }
 
-  return { booted, busy, error, family, familyId, members, dicts, online, pending,
+  return { booted, busy, error, family, familyId, members, dicts, online, pending, evicted,
            ingredients, methods, tags, boot, retry, enter, join, refreshDicts, reloadMembers };
 });

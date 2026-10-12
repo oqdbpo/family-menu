@@ -97,13 +97,24 @@ C（本地优先 + 轻同步）之后，选定 **B′ = Supabase 免费层 + Git
         │
         └──> 得到一个 auth.uid()
                 │
-                └──> 用邀请码调 join_family(code, '爸爸')
+                └──> 用邀请码调 join_family(code, '妈妈')
                         │
-                        └──> 该 uid 被登记成 family_members 的一行
+                        ├──> 这家已经有叫「妈妈」的行 → 把这台设备接到那一行上（认领）
+                        │
+                        └──> 没有 → 新建一行（永远建不出 owner）
 ```
 
-爸爸 / 妈妈 / 孩子各用一台设备，天然就是三个成员，不需要注册。
-代价是**换设备或清浏览器数据后要重新用邀请码进一次**，家庭场景可接受。
+**人是 `family_members` 那一行，设备只是"此刻谁在代表这个人"。**
+偏好、订单、管理员角色都挂在行上，`auth_uid` 可以换，换了数据不跟着换（0009）。
+一个家里名字唯一（按 `lower(name)` 比较），所以同名的第二台设备是"顶替"而不是"新增"——
+**同一个名字同一时间只认一台设备**，被顶掉的那台会退回加入页，点一次自己的名字就回来。
+
+爸爸 / 妈妈 / 孩子各用一台设备，天然就是三个成员，不需要注册，也不需要设密码。
+
+明确接受的代价（选这条路的交换条件，**别当 bug 复查**）：
+任何知道邀请码的人都能认领这个家里的任意身份，包括管理员那一行——能改家庭名、能移除成员。
+挡住外人靠的是"邀请码只发给自己家"这一条，数据库不设第二道门。
+要加第二道门就得回到口令/账号体系，那就不是"家人点开就能用"这个东西了。
 
 关键约束：**所有数据隔离必须由 RLS 在数据库层强制**，不允许只在前端判断。
 anon key 是设计上就会暴露在前端的，没有 RLS 就等于任何拿到 URL 的人都能读写你家的库。
@@ -1207,11 +1218,12 @@ PWA 手机体验优化
    node supabase/run-sql.mjs supabase/migrations/0006_seafood_ingredient.sql
    node supabase/run-sql.mjs supabase/migrations/0007_cancel_and_move_order.sql
    node supabase/run-sql.mjs supabase/migrations/0008_more_ingredients.sql
+   node supabase/run-sql.mjs supabase/migrations/0009_identity_by_name.sql
 ⑤ node supabase/run-sql.mjs supabase/seed.sql
 ⑥ 通知 PostgREST 重载 schema 缓存：
      notify pgrst, 'reload schema';
      ↑ 不做这步，/rest/v1/rpc/* 会返回 404 "requested path is invalid"
-⑦ node supabase/verify.mjs --write     只读 24 项，加 --write 走写链路共 25 项，全绿才算通
+⑦ node supabase/verify.mjs             35 项全绿才算通（默认不写数据；加 --write 再跑一遍确认点餐写链路）
 ⑧ 建 GitHub 仓库并推送，配 4 项 Actions Secrets/Variables，手动 Run 一次 workflow
 ```
 
@@ -1358,7 +1370,7 @@ supabase rpc random_table(people, meal_type)
 | `supabase/migrations/0002_family_id_default.sql` | 已执行 |
 | `supabase/seed.sql` | 已执行，30 道菜 + 11 条历史订单 |
 | Storage `dish-images` | 11 张菜品插画已上传并回填 `image_path`，剩 19 道待家人实拍 |
-| `supabase/verify.mjs` | 只读 24 项；加 `--write` 共 25 项（含 RLS 隔离、随机权重、成员守卫、管理员移交、取消/挪动、confirm 幂等）。**跑完自动删掉本次的匿名身份**，不再往示范家庭堆陌生成员；要看现场加 `--keep-session`。⚠ 其中 §37.13 那 7 项**没通过 HTTP 跑过**（当时本机代理没监听），是用等效的 SQL 探针验的，代理恢复后补跑一次。**2026-10-03 补跑结果：21 过 / 1 挂（反悔链路，脚本自身的顺序 bug，见 37.16 末）/ 1 跳过** |
+| `supabase/verify.mjs` | **35 项全绿（2026-10-12，走真 HTTP）**：RLS 隔离、随机权重、成员守卫、管理员移交、取消/挪动、confirm 幂等、名字即身份（0009 那 9 项）。**跑完自动删掉本次的匿名身份**，不再往示范家庭堆陌生成员；要看现场加 `--keep-session`。§37.13 那 7 项当时的脚本顺序 bug 已修（见 37.16 末） |
 | `.github/workflows/keepalive.yml` | **已上线并跑通**：首次手动运行 `conclusion=success`，PostgREST 返回 200，心跳提交已由 `keepalive-bot` 推回仓库 |
 | GitHub 仓库 | `oqdbpo/family-menu`，**public**（Pages 免费档不支持私有库），main 分支 |
 | GitHub Pages | **已上线** `https://oqdbpo.github.io/family-menu/`；`deploy-web` run #1 success；强制直连实测首页 / manifest / sw.js / 图标 / JS 主包全部 200 |
@@ -1369,6 +1381,7 @@ supabase rpc random_table(people, meal_type)
 | `src/` Vue 3 前端 | 7 个页面（含新增的家庭成员页）+ 加入家庭页，已连真实数据跑通 |
 | 应用名 | 已改为 **米粒爱吃饭**（首页 + 加入页抬头 + 标签页标题 + PWA 图标名四处一起，见 37.14） |
 | `migrations/0004`～`0006` + 成员管理页 | **已在真机点过一遍**：浏览器里移除示范成员、交出管理员、试图移除现任管理员被数据库拒绝 → 每步都回读数据库核对 → 恢复到 seed 状态。见 37.10 |
+| `migrations/0009_identity_by_name.sql` | **已执行、35 项自检全绿、并在内置浏览器里点完整条回路**：身份从"设备 uuid"改成"按名字认领成员行"，管理员改读 `role`。见 37.17 |
 | 「我的」点不进去 | **已修**：部署后旧 chunk 文件名 404，部署前打开的标签页点懒加载路由就没反应。`src/main.js` 接 `vite:preloadError` 重载一次。见 37.11 |
 | 清理脚本 | `cleanup-test-members.sql`（自检遗留成员）、`cleanup-orphan-identities.sql`（无主匿名身份，实测清掉 9 个） |
 | `tools/dev-tunnel.mjs` | 本地隧道。给不吃系统代理的浏览器（内置预览面板）开一条到 Supabase 的真数据通路，见 37.10.1 |
@@ -1405,7 +1418,8 @@ supabase rpc random_table(people, meal_type)
           supabase-js 必须设 detectSessionInUrl:false，否则它会吃掉 #/order 这种 hash
 配置      VITE_SB_URL 是唯一出口地址。上反代时只改 .env，代码零改动
           本地生成：node tools/gen-env.mjs（读 supabase/.env.local）
-令牌      匿名 uid 存在浏览器里，换设备/清数据 = 新成员，需重新走邀请码
+令牌      匿名 uid 存在浏览器里，但它只代表"这台设备"。人是 family_members 那一行，
+          换设备/清数据后在加入页点一次自己的名字就接回来（0009，见 37.17）
 ```
 
 **建单时机**是个踩过的坑：最初 `ensureDraft()` 挂在页面 `load()` 上，结果只是浏览一下
@@ -1874,11 +1888,72 @@ o3 的撞车测试继续用明天晚餐。要我改就说一声。
 
 - **两台真设备**没验过（内置面板只有一个标签页）。同一次改动在两台机器上的最坏延迟
   = 一个周期 45 秒 + 请求耗时；任何一方刚切回前台则是立刻。
-- 一家人**各自设备上是各自的身份**（`auth.uid` 存本机，清数据 = 新成员，见 §37.7）。
-  同步的是家庭数据，不是登录态。
+- 身份是**按名字认领**的，不是按设备（0009，见 §37.17）。所以"同步的是家庭数据，不是登录态"
+  这句话现在有两层意思：换设备凭名字就能回来，但同一个名字同一时间只认一台设备。
 - 轮询拉的是"当前这一顿 + 菜库 + 成员"；**点餐历史/常吃榜**（`recentHistory` 是 N+1 请求，
   一屏 30 单就是 31 个请求）刻意不放进周期任务，重新进页面时才更新。
 - 真手机上还取决于那一条网络可达性：能连上 API 的设备才谈得上同步（§37.9）。
+
+## 37.17 名字即身份：妈妈重新登录就不是她了（0009）
+
+### 病灶
+
+原模型把 `auth.uid()` 当人。uid 存在本机 localStorage，于是换手机、换浏览器、
+清过数据、开一次无痕 = 一个新 uid = `join_family` 插一条**新成员行**。
+更糟的是 `families.owner_uid` 也绑在 uid 上，管理员随设备漂移。
+
+真实数据里踩到了：同一个「妈妈」在 10-02 和 10-12 各长出一行，9 条口味票和 13 笔订单
+留在旧行上，新登录的那台设备看到的是"没投过票、没点过菜"的陌生人。
+合并动作在库外的一次性脚本里做的（快照留在 `I:\`，不进仓库），零损失——两行重叠的
+2 条票内容完全一致。
+
+### 分层
+
+```text
+family_members 那一行  = 人     ← 偏好、订单、role 都挂在行上
+auth_uid               = 此刻哪台设备在代表这个人  ← 可以换，换了数据不跟着换
+```
+
+- `member_name_uniq (family_id, lower(name))`：一个家里名字唯一，这是"认领"能成立的前提，
+  顺手堵死重复成员行。上线前实测现存数据无重名，索引才建得起来。
+- `join_family` 改成认领式：先把这个 uid 从别的名字上解绑（一台设备只能代表一个人），
+  再按 `lower(name)` 找——找到就接上去，找不到才新建。**新建的那条永远不是 owner**，
+  否则"知道邀请码 + 起个新名字"就能造一个管理员。
+- 管理员改为读 `family_members.role`。`families.owner_uid` 留着但改成可空、不再被任何
+  策略和函数读取——刻意不删是为了可回退，同时停止写入，免得它变成第二个真相源
+  （0005 那次就是栽在有两个真相）。`fam_write`、`transfer_owner`、`remove_member`、
+  `member_overview` 全部改判 `role = 'owner'`。
+- `rename_self` 现在会先查重，撞名时报"家里已经有叫「X」的人了"，而不是把 postgres 的
+  23505 原文甩给用户。
+- 新增 `family_roster(code)`：加入页拿它换回"这家都有谁"。**码错返回空数组而不是报错**，
+  免得被拿来枚举哪些邀请码有效。
+
+### 前端跟着改的三处
+
+- `Join.vue`：填够 6 位邀请码就拉名单，名字变成可点的 chip。手打的风险很实在——
+  多一个空格就是另一个人，原来的票和订单接不回来。chip 只是把名字填进输入框，
+  仍然可以起一个新名字给家里添人。
+- `stores/session.js`：`reloadMembers()` 发现名单空了但家庭还在 = 本机已经被顶下这个家
+  （RLS 会把整个家藏起来），于是 `dropFamily()` 清本机身份并举起 `evicted`；
+  `App.vue` watch 到就 `replace('/join')`。不处理的话页面会继续显示旧数据、
+  写操作一条条被拒，看起来像"坏了"。
+- `Join.vue` 的 `evicted` 横幅：说清"这个称呼被另一台设备拿走了，点一次名字就能拿回来，
+  偏好和点过的菜一条都不会少"，并把默认 tab 留在「加入家庭」——否则人会以为要重新建一个家。
+
+### 验证
+
+`supabase/verify.mjs` 第 11 节，9 项，全在临时家庭里跑，不碰 DEMO01 和真家庭：
+认领回同一条成员行（id 相同、全户仍 1 人）、被顶掉的老设备读不到家庭、
+大小写/首尾空格仍算同一个人、新名字建不出 owner、roster 码错给空、
+改名撞车被拒且谁都没动、绕过函数直接插重名被唯一索引挡、
+管理员权限跟着 role 走（老设备被顶掉后新设备仍能改家庭名，普通成员改不动）、
+以及把"知道邀请码即可冒充管理员"这条**当成断言写进去**（`【设计如此】`），
+以后谁把它当 bug 修，测试会先拦住。
+
+35/35 全绿，走的是真 HTTP。另外在内置浏览器里点完了整条回路：
+以 DEMO01 的「孩子」进来（4 人不变、种子占位行被接上、6 条票跟着回来）→
+用第二个匿名身份抢走同一个名字 → 页面自己退回加入页并显示横幅 → 再点一次「孩子」回来。
+临时身份和 DEMO01 的绑定状态事后都清回了原样。
 
 ## 项目核心原则
 

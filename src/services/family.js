@@ -29,7 +29,17 @@ export async function createFamily(name, myName) {
 export async function joinFamily(code, myName) {
   const { data, error } = await sb.rpc('join_family', { p_code: code, p_name: myName });
   if (error) throw error;
+  resetMemberCache();          // 名字可能认领到了另一条成员行，旧 id 立刻作废
   return data;
+}
+
+// 加入页的名单：凭邀请码换回"这家都有谁"，好让家人点自己的名字而不是手打。
+// 手打的风险很实在——多打一个空格就是另一个人，原来的口味票和订单接不回来。
+// 码错时数据库返回空数组而不是报错（0009），所以这里"没名单"不代表"码一定错"
+export async function familyRoster(code) {
+  const { data, error } = await sb.rpc('family_roster', { p_code: code });
+  if (error) throw error;
+  return data || [];
 }
 
 export async function renameSelf(name) {

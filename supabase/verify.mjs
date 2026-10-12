@@ -244,7 +244,7 @@ try {
     const list1 = await call('/rest/v1/rpc/member_overview', { method: 'POST', body: {}, auth: true, tok: tc });
     const boss = list1.find(m => m.name === '甲'), deputy = list1.find(m => m.name === '乙');
 
-    say('is_owner 只认 owner_uid，且全户只有一个',
+    say('is_owner 认的是成员行上的 role，且全户只有一个',
         list1.length === 2 && boss?.is_owner === true && deputy?.is_owner === false,
         `甲 ${boss?.is_owner} / 乙 ${deputy?.is_owner}`);
 
@@ -435,7 +435,112 @@ if (WRITE_TEST) {
   console.log('  SKIP  确认点餐全链路（加 --write 开启，会往示范家庭写一条记录）');
 }
 
-// ---------- 11. 自清理：删掉本次创建的所有匿名身份 ----------
+// ---------- 11. 名字即身份（方案 C）----------
+// 换手机 / 清过数据 / 开无痕 = 新的匿名 uid。旧实现把 uid 当人，于是同一个人长出两条
+// 成员行，偏好、订单、管理员全留在旧行上 —— 这就是"妈妈重新登录后就不是她了"的根因。
+// 现在按名字认领：同一家里同名 = 同一个人，auth_uid 只表示"此刻哪台设备在代表她"。
+// 明确接受的代价：知道邀请码的人就能认领任意身份，包括管理员（第 ⑨ 条就是把它测出来，
+// 别当 bug 复查）。所以整户只有临时家庭，绝不碰 DEMO01 和真家庭。
+{
+  let scratch = null;
+  const sign = async () => {
+    const r = await call('/auth/v1/signup', { method: 'POST', body: { anonymous: true } });
+    if (r.user?.id) identities.push(r.user.id);
+    return r.access_token;
+  };
+  const join = (tok, p_code, p_name) => call('/rest/v1/rpc/join_family',
+    { method: 'POST', body: { p_code, p_name }, auth: true, tok });
+  const overview = (tok) => call('/rest/v1/rpc/member_overview', { method: 'POST', body: {}, auth: true, tok });
+  try {
+    const momA = await sign();                       // 妈妈的第一台设备
+    const f = await call('/rest/v1/rpc/create_family',
+      { method: 'POST', body: { p_name: '身份自检家', p_owner_name: '妈妈' }, auth: true, tok: momA });
+    scratch = Array.isArray(f) ? f[0] : f;
+    const code = scratch.invite_code;
+
+    // ① 本项检查的核心：第二台设备凭名字回来，必须落回同一条成员行
+    const momB = await sign();
+    const claimed = await join(momB, code, '妈妈');
+    say('换设备凭名字认领回同一个人（不产生新成员行）',
+        claimed === scratch.member_id,
+        `首台 ${String(scratch.member_id).slice(0, 8)}… / 次台 ${String(claimed).slice(0, 8)}…`);
+
+    const list = await overview(momB);
+    say('认领后全户仍只有 1 人，管理员身份跟着人走',
+        list.length === 1 && list[0].name === '妈妈' && list[0].is_owner === true && list[0].is_self === true,
+        `${list.length} 人：${list.map(x => x.name + (x.is_owner ? '(owner)' : '')).join('、')}`);
+
+    // ② 一个名字同一时间只认一台：被顶掉的那台应该退回"没加入任何家庭"
+    const kicked = await overview(momA);
+    const blind = await call('/rest/v1/dishes?select=id&limit=99', { auth: true, tok: momA });
+    say('被顶掉的老设备读不到家庭（一个名字同一时间只认一台）',
+        kicked.length === 0 && blind.length === 0,
+        `老设备看到 ${kicked.length} 人 / ${blind.length} 道菜`);
+
+    // ③ 大小写和首尾空格差不算两个人：join 里 trim、唯一索引里 lower
+    const grandma = await sign();
+    const g1 = await join(grandma, code, 'yeye');
+    const grandpa = await sign();
+    const g2 = await join(grandpa, code, ' YEYE ');
+    say('名字大小写 / 首尾空格差异仍认领到同一个人', g1 === g2, `${String(g1).slice(0, 8)}… vs ${String(g2).slice(0, 8)}…`);
+
+    // ④ 起个新名字只能造出普通成员 —— owner 只能来自 create_family 或 transfer_owner
+    const kid = await sign();
+    const kidId = await join(kid, code, '孩子');
+    const kidRow = (await overview(kid)).find(x => x.id === kidId);
+    say('拿邀请码新建名字建不出管理员', kidRow && kidRow.is_owner === false && kidRow.role === 'member',
+        kidRow ? `${kidRow.name} role=${kidRow.role}` : '没找到新成员行');
+
+    // ⑤ 加入页的名单：码对给名单，码错给空数组（不报错，免得被拿来枚举有效邀请码）
+    const roster = await call('/rest/v1/rpc/family_roster', { method: 'POST', body: { p_code: code } });
+    const wrong = await call('/rest/v1/rpc/family_roster', { method: 'POST', body: { p_code: 'NOPE99' } });
+    say('family_roster 码对给名单、码错给空（不泄邀请码有效性）',
+        Array.isArray(roster) && roster.length === 3 && roster.some(x => x.is_owner) && Array.isArray(wrong) && wrong.length === 0,
+        `${Array.isArray(roster) ? roster.map(x => x.name).join('、') : '非数组'} / 错码得 ${JSON.stringify(wrong)}`);
+
+    // ⑥ 改名撞车要说人话（postgres 的 23505 原文没人看得懂），且两边都不动
+    let collide = '';
+    try { await call('/rest/v1/rpc/rename_self', { method: 'POST', body: { p_name: '妈妈' }, auth: true, tok: kid }); }
+    catch (e) { collide = e.message; }
+    const stillThere = await overview(kid);
+    say('改名撞车被拒且提示能读，谁都没动',
+        /家里已经有叫/.test(collide) && stillThere.length === 3
+        && stillThere.find(x => x.id === kidId)?.name === '孩子',
+        collide || '没报错，两个人重名了');
+
+    // ⑦ 唯一索引兜底：绕过函数直接插重名也得被拒（前端/别的客户端都躲不过）
+    let dupErr = '';
+    try {
+      await mgmt(`insert into public.family_members (family_id, name) values ('${scratch.family_id}'::uuid, '妈妈');`);
+    } catch (e) { dupErr = e.message; }
+    say('直接往库里插重名被唯一索引挡住', /member_name_uniq|23505|duplicate key/i.test(dupErr), dupErr || '竟然插进去了');
+
+    // ⑧ 权限认 role 不认设备：认领回管理员的那台设备照样能改家庭名，普通成员不能
+    const renamed = await call(`/rest/v1/families?id=eq.${scratch.family_id}`, {
+      method: 'PATCH', auth: true, tok: momB, prefer: 'return=representation', body: { name: '改名成功' },
+    });
+    const denied = await call(`/rest/v1/families?id=eq.${scratch.family_id}`, {
+      method: 'PATCH', auth: true, tok: kid, prefer: 'return=representation', body: { name: '普通成员想改名' },
+    });
+    say('管理员权限跟着 role 走（老设备被顶掉后新设备仍能改家庭名，普通成员改不动）',
+        renamed.length === 1 && renamed[0].name === '改名成功' && denied.length === 0,
+        `owner 改到 ${renamed.length} 行 / member 改到 ${denied.length} 行`);
+
+    // ⑨ 设计如此，不是漏洞：任何拿到邀请码的设备都能认领管理员那一行
+    const intruder = await sign();
+    const took = await join(intruder, code, '妈妈');
+    const afterIntrude = await overview(intruder);
+    say('【设计如此】知道邀请码即可认领任意身份，含管理员',
+        took === scratch.member_id && afterIntrude.find(x => x.name === '妈妈')?.is_self === true,
+        '挡住外人只靠"邀请码不外泄"，数据库不设第二道门');
+  } catch (e) {
+    say('名字即身份链路', false, e.message);
+  } finally {
+    if (scratch?.family_id) await mgmt(`delete from families where id = '${scratch.family_id}'::uuid;`).catch(() => {});
+  }
+}
+
+// ---------- 12. 自清理：删掉本次创建的所有匿名身份 ----------
 // 第 2 项检查的前提是"这个会话还没加入任何家庭"，所以每轮都必须新签一个身份，
 // 不能复用缓存 token。代价是不管的话，示范家庭里会一路堆陌生成员
 // （实测几轮下来攒了 4 个"新成员/自检设备"）。默认自己擦干净；
