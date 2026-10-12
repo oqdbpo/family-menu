@@ -2,7 +2,8 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { todayISO, getOrderByMeal, ensureDraft, loadOrder, setItemQuantity,
          confirmOrder, cancelOrder, moveOrder, recentHistory } from '../services/orders';
-import { submit } from '../lib/db';
+import { submit, listPending } from '../lib/db';
+import { onSync } from '../lib/sync';
 import { classifyError } from '../config';
 
 const guessMeal = () => {
@@ -11,6 +12,13 @@ const guessMeal = () => {
   if (h < 15) return '午餐';
   return '晚餐';
 };
+
+// services 层抛上来的是原始错误（"Failed to fetch"），家里人看不懂。
+// 建单那一跳不能离线排队（连不上就不知道远端有没有这条草稿，排队会在外键上把整条队列卡死），
+// 所以话要说清楚：等网络好了重新点一次
+const feedback = e => (classifyError(e) === 'offline'
+  ? new Error('现在连不上厨房，这一顿还没记上；等网络好了再点一次就行')
+  : e);
 
 export const useOrderStore = defineStore('order', () => {
   const date = ref(todayISO());
@@ -42,6 +50,7 @@ export const useOrderStore = defineStore('order', () => {
   async function load() {
     loading.value = true;
     error.value = null;
+    syncNotice.value = '';   // 换了日期或餐次，上一条"别的设备改了这顿"就不相关了
     try {
       const head = await getOrderByMeal(date.value, mealType.value);
       order.value = head ? await loadOrder(head) : emptyHead();
@@ -51,6 +60,53 @@ export const useOrderStore = defineStore('order', () => {
       loading.value = false;
     }
   }
+
+  // ---- 多设备同步：这一顿可能被家里的另一台设备确认 / 清空 / 挪走 --------------
+  // 规则一：本机还有没传上去的点餐改动时，一律不拿远端覆盖本地视图。
+  //         否则"我刚点的三道菜"会被远端旧内容刷没，看起来就是数据丢了。
+  // 规则二：只在内容有实质差异时才动 order.value，且不翻 loading —— 列表不闪。
+  const syncNotice = ref('');
+  let noticeTimer = null;
+  const say = msg => {
+    syncNotice.value = msg;
+    clearTimeout(noticeTimer);
+    noticeTimer = setTimeout(() => { syncNotice.value = ''; }, 12_000);
+  };
+
+  const sig = o => (o?.id
+    ? `${o.status}|${(o.items || []).map(i => `${i.dish_id}:${i.quantity}`).sort().join(',')}`
+    : '');
+
+  // 队里有没有"这一顿"的欠账：明细、整单、以及三个 RPC 都算
+  const hasLocalOrderOps = () => listPending().then(ops => ops.some(o =>
+    String(o.table || '').startsWith('meal_')
+    || ['confirm_order', 'cancel_order', 'move_order'].includes(o.fn)));
+
+  function whatChanged(from, to) {
+    if (!to?.id) return '这顿在别的设备上被清空或挪走了';
+    if (from.status !== 'draft' && to.status === 'draft') return '别的设备把这一顿退回了草稿，可以接着改';
+    if (to.status !== 'draft') return '这顿已经被别的设备确认过了';
+    const n = (to.items || []).length;
+    return n === (from.items || []).length
+      ? '别的设备改了这顿的菜，已按最新的显示'
+      : `别的设备把这顿改成了 ${n} 道菜，已按最新的显示`;
+  }
+
+  async function sync() {
+    try {
+      if (await hasLocalOrderOps()) return;
+      const head = await getOrderByMeal(date.value, mealType.value);
+      const remote = head ? await loadOrder(head) : null;
+      const was = sig(order.value);
+      if (was === sig(remote)) return;
+      // 本地还是"没落库的虚拟草稿"时静默采纳，不该为第一次看到这条单而弹提示
+      if (was) say(whatChanged(order.value, remote));
+      order.value = remote || emptyHead();
+    } catch (e) {
+      error.value = classifyError(e);
+    }
+  }
+  onSync(sync, 'order');
 
   // 连点两下"加菜"会并发触发两次建单，第二次撞 meal_orders 的唯一约束。
   // 用同一个 in-flight promise 收口，保证并发只建一次。
@@ -70,7 +126,7 @@ export const useOrderStore = defineStore('order', () => {
 
   async function add(dish)     { return setQty(dish, qtyOf(dish.id) + 1); }
   async function dropOrder(o) {
-    const r = await submit({ type: 'delete', table: 'meal_orders', id: o.id }, { label: '清空这顿' });
+    const r = await submit({ type: 'delete', table: 'meal_orders', id: o.id }, { label: '清空这顿', tag: 'order' });
     if (!r.error) order.value = emptyHead();
     return r;
   }
@@ -99,7 +155,7 @@ export const useOrderStore = defineStore('order', () => {
       }
       return r;
     } catch (e) {
-      return { queued: false, error: e };
+      return { queued: false, error: feedback(e) };
     }
   }
 
@@ -109,7 +165,7 @@ export const useOrderStore = defineStore('order', () => {
       if (!o?.id) { order.value = emptyHead(); return { queued: false }; }
       if (o.status !== 'draft') return { queued: false, error: new Error('已经确认的一顿不能清空') };
       return await dropOrder(o);
-    } catch (e) { return { queued: false, error: e }; }
+    } catch (e) { return { queued: false, error: feedback(e) }; }
   }
 
   async function confirm() {
@@ -118,7 +174,7 @@ export const useOrderStore = defineStore('order', () => {
       const r = await confirmOrder(order.value);
       if (!r.error) await load();
       return r;
-    } catch (e) { return { queued: false, error: e }; }
+    } catch (e) { return { queued: false, error: feedback(e) }; }
   }
 
   async function cancel() {
@@ -127,7 +183,7 @@ export const useOrderStore = defineStore('order', () => {
       const r = await cancelOrder(order.value);
       if (!r.error) await load();     // 重读而不是本地改 status：统计变了，以库为准
       return r;
-    } catch (e) { return { queued: false, error: e }; }
+    } catch (e) { return { queued: false, error: feedback(e) }; }
   }
 
   // 挪完跟着视图走到新位置，否则用户看到的还是原来那个空槽，以为没挪成功。
@@ -139,7 +195,7 @@ export const useOrderStore = defineStore('order', () => {
       const r = await moveOrder(o, d, t);
       if (!r.error) { date.value = d; mealType.value = t; await load(); }
       return r;
-    } catch (e) { return { queued: false, error: e }; }
+    } catch (e) { return { queued: false, error: feedback(e) }; }
   }
 
   async function loadHistory(limit = 30) {
@@ -148,6 +204,6 @@ export const useOrderStore = defineStore('order', () => {
   }
 
   return { date, mealType, order, order_items: items, items, count, totalMinutes, qtyOf, isDraft, locked, canCancel,
-           loading, error, history, load, setMealType, setDate, add, setQty, clearAll,
+           loading, error, history, syncNotice, load, sync, setMealType, setDate, add, setQty, clearAll,
            confirm, cancel, moveTo, loadHistory };
 });

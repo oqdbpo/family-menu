@@ -3,7 +3,8 @@ import { ref, computed, reactive } from 'vue';
 import { ensureSession, myFamily, listMembers, resetMemberCache, createFamily, joinFamily } from '../services/family';
 import { loadDicts } from '../services/dicts';
 import { classifyError } from '../config';
-import { pending, flush } from '../lib/db';
+import { pending } from '../lib/db';
+import { onSync } from '../lib/sync';
 
 export const useSessionStore = defineStore('session', () => {
   const booted = ref(false);
@@ -74,14 +75,18 @@ export const useSessionStore = defineStore('session', () => {
     members.value = await listMembers();
   }
 
+  // 成员名单是这台设备上「家里还剩谁」的唯一依据：别的设备加入或被移除，人数徽章
+  // 不该一直停在旧值。tag 留空 = 每一轮同步都跑它。
+  onSync(async () => {
+    if (family.value) await reloadMembers();
+    // 另一种情况更要紧：这台设备当初是因为连不上才卡在"没加入"的（境内网络是高概率失败，
+    // 不是断网，navigator.onLine 一直是 true，所以 online 事件根本不会来）。
+    // 网络通了它该自己爬起来，而不是逼家里人手动刷新页面。
+    else if (error.value && !busy.value) await retry();
+  });
+
   if (typeof window !== 'undefined') {
-    window.addEventListener('online', async () => {
-      online.value = true;
-      if (pending.value) {
-        const r = await flush();
-        if (r.ok && !family.value) await retry();
-      }
-    });
+    window.addEventListener('online', () => { online.value = true; });
     window.addEventListener('offline', () => { online.value = false; });
   }
 

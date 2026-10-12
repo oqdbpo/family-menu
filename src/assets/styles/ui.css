@@ -392,6 +392,13 @@ button { font-family: inherit }
 .fambadge { display: flex; align-items: center; gap: 7px; background: var(--surface); border-radius: var(--r-pill); padding: 5px 12px 5px 6px; box-shadow: var(--sh-card); margin: 0 auto; width: max-content; font-size: 12px; font-weight: 700; color: var(--ink-2); border: 0; cursor: pointer }
 
 .hint { font-size: 12.5px; color: var(--ink-3) }
+/* 同步状态条：右上角一行小字，告诉家里人"这是什么时候的账"，点一下立刻去对一次 */
+.syncbar { display: flex; align-items: center; gap: 5px; margin: 8px 0 0 auto; width: max-content;
+  padding: 2px 0; border: 0; background: none; font-size: 11px; color: var(--ink-3);
+  font-family: inherit; cursor: pointer }
+.syncbar svg { stroke: var(--olive-mid) }
+.syncbar span { letter-spacing: .2px }
+.syncbar:disabled { cursor: default }
 /* 刷新中的反馈：没有这条，点刷新按钮看起来像没反应（keyframes spin 见 .dice-btn） */
 .spin { animation: spin .8s linear infinite }
 button:disabled { cursor: default }

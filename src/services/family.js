@@ -1,6 +1,6 @@
 import { sb } from '../lib/supabase';
 import { ensureSession } from '../lib/supabase';
-import { submit } from '../lib/db';
+import { submit, announceWrite } from '../lib/db';
 
 export { ensureSession };
 
@@ -35,6 +35,7 @@ export async function joinFamily(code, myName) {
 export async function renameSelf(name) {
   const { error } = await sb.rpc('rename_self', { p_name: name });
   if (error) throw error;
+  announceWrite('member');
 }
 
 // 成员管理页用：把「有没有绑设备 / 是不是我自己 / 名下多少偏好和多少顿」一次拿回，
@@ -50,6 +51,7 @@ export async function memberOverview() {
 export async function removeMember(id) {
   const { data, error } = await sb.rpc('remove_member', { p_member: id });
   if (error) throw error;
+  announceWrite('member');
   return data;
 }
 
@@ -57,6 +59,7 @@ export async function removeMember(id) {
 export async function transferOwner(id) {
   const { data, error } = await sb.rpc('transfer_owner', { p_member: id });
   if (error) throw error;
+  announceWrite('member');
   return data;
 }
 
@@ -67,7 +70,7 @@ export async function vote(dishId, pref) {
   return submit({
     type: 'upsert', table: 'member_dish_preferences',
     row: { member_id: me, dish_id: dishId, pref }, onConflict: 'member_id,dish_id',
-  }, { label: '投票' });
+  }, { label: '投票', tag: 'vote' });
 }
 
 // 我在自家菜库里的全部口味票，一次拉回来做成 { 菜id: -1|0|1 }。

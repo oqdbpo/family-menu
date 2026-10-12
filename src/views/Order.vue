@@ -59,10 +59,10 @@
 
         <div class="hint" style="margin:10px 0 8px">{{ sectionLabel }} · {{ dishes.visible.length }} 道</div>
 
-        <div v-if="order.locked || notice" class="banner warn" style="margin-bottom:10px">
+        <div v-if="order.locked || notice || order.syncNotice" class="banner warn" style="margin-bottom:10px">
           <Ic name="clock" :size="16" />
           <div><b v-if="order.locked">「{{ order.mealType }}」已经确认过了</b>
-            {{ notice || '这一顿是历史，不能再加菜。换个餐次或日期就能继续点。' }}</div>
+            {{ notice || order.syncNotice || '这一顿是历史，不能再加菜。换个餐次或日期就能继续点。' }}</div>
         </div>
 
         <DishCard v-for="d in dishes.visible" :key="d.id" :dish="d" :qty="order.qtyOf(d.id)"

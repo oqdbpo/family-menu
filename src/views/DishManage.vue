@@ -107,7 +107,6 @@ import Ic from '../components/Ic.vue';
 import DishThumb from '../components/DishThumb.vue';
 import StateBlock from '../components/StateBlock.vue';
 import DishForm from '../components/DishForm.vue';
-import { fetchDishes, removeDish } from '../services/dishes';
 import { useDishStore, daysSince } from '../stores/dishes';
 import { useSessionStore } from '../stores/session';
 import { useDicts } from '../composables/useDicts';
@@ -115,8 +114,10 @@ import { useDicts } from '../composables/useDicts';
 const dishes = useDishStore();
 const session = useSessionStore();
 const { ingredientName, methodName } = useDicts();
-const rows = ref([]);
-const loading = ref(false);
+// 数据只在 store 里存一份：别的设备改了菜库，这一页跟着 sync 一起刷新，
+// 不再自己另拉一次（之前两边会新旧不一致）
+const rows = computed(() => dishes.rows);
+const loading = computed(() => dishes.loading);
 const q = ref('');
 const panel = ref('全部');
 const formOpen = ref(false);
@@ -128,12 +129,7 @@ const panels = [
   { key: '停用', label: '停用' }, { key: '收藏', label: '收藏' },
 ];
 
-async function load(force = false) {
-  loading.value = true;
-  try { rows.value = await fetchDishes({ includeInactive: true }); }
-  finally { loading.value = false; }
-  if (force) await dishes.load(true);
-}
+const load = (force = false) => dishes.load(force);
 
 const counts = computed(() => ({
   全部: rows.value.filter(d => d.is_active).length,
@@ -162,16 +158,14 @@ function create() { editing.value = null; formOpen.value = true; }
 function edit(d) { editing.value = d; formOpen.value = true; }
 
 async function toggle(d) {
-  const next = !d.is_active;
-  const r = await dishes.setActive(d, next);
-  if (!r.error) d.is_active = next;
+  await dishes.setActive(d, !d.is_active);
 }
 
 async function del(d) { confirmDel.value = d; }
 async function confirmRemove() {
   const d = confirmDel.value; confirmDel.value = null;
-  try { await removeDish(d); await load(true); }
-  catch (e) { window.alert(e.friendly || e.message); }
+  const r = await dishes.remove(d);
+  if (r.error) window.alert(r.error.friendly || r.error.message);
 }
 async function confirmDisable() {
   const d = confirmDel.value; confirmDel.value = null;

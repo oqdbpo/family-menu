@@ -48,7 +48,7 @@ export async function setItemQuantity(order, dish, quantity) {
   if (quantity <= 0) {
     const existing = order.items.find(i => i.dish_id === dish.id);
     if (!existing) return { queued: false };
-    const r = await submit({ type: 'delete', table: 'meal_order_items', id: existing.id }, { label: `移除 ${dish.name}` });
+    const r = await submit({ type: 'delete', table: 'meal_order_items', id: existing.id }, { label: `移除 ${dish.name}`, tag: 'order' });
     if (!r.error) order.items = order.items.filter(i => i.id !== existing.id);
     return r;
   }
@@ -56,7 +56,7 @@ export async function setItemQuantity(order, dish, quantity) {
     type: 'upsert', table: 'meal_order_items',
     row: { order_id: order.id, dish_id: dish.id, quantity, category: dish.category },
     onConflict: 'order_id,dish_id',
-  }, { label: `点 ${dish.name}` });
+  }, { label: `点 ${dish.name}`, tag: 'order' });
   if (!r.error) {
     const hit = order.items.find(i => i.dish_id === dish.id);
     if (hit) hit.quantity = quantity;
@@ -66,7 +66,7 @@ export async function setItemQuantity(order, dish, quantity) {
 }
 
 export async function confirmOrder(order) {
-  const r = await submit({ type: 'rpc', fn: 'confirm_order', args: { p_order: order.id } }, { label: '确认点餐' });
+  const r = await submit({ type: 'rpc', fn: 'confirm_order', args: { p_order: order.id } }, { label: '确认点餐', tag: 'order' });
   if (!r.error) order.status = 'confirmed';
   return r;
 }
@@ -74,7 +74,7 @@ export async function confirmOrder(order) {
 // 取消确认：退回草稿。统计由数据库里的 refresh_family_stats() 全量重算，
 // 前端不做任何 +1/-1 的补偿——那样又是第二个算数的地方
 export async function cancelOrder(order) {
-  const r = await submit({ type: 'rpc', fn: 'cancel_order', args: { p_order: order.id } }, { label: '取消点餐' });
+  const r = await submit({ type: 'rpc', fn: 'cancel_order', args: { p_order: order.id } }, { label: '取消点餐', tag: 'order' });
   if (!r.error) order.status = 'draft';
   return r;
 }
@@ -84,7 +84,7 @@ export async function moveOrder(order, date, mealType) {
   return submit({
     type: 'rpc', fn: 'move_order',
     args: { p_order: order.id, p_date: date, p_meal_type: mealType },
-  }, { label: `挪到 ${date} ${mealType}` });
+  }, { label: `挪到 ${date} ${mealType}`, tag: 'order' });
 }
 
 export async function recentHistory(limit = 30) {

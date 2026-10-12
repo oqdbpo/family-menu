@@ -1,5 +1,5 @@
 import { sb } from '../lib/supabase';
-import { submit } from '../lib/db';
+import { submit, announceWrite } from '../lib/db';
 
 export const DISH_SELECT = `id,name,meal_type,category,subcategory,ingredient_id,cooking_method_id,
 description,image_path,spicy_level,difficulty,cooking_time,is_favorite,is_active,eat_count,last_eaten_at,
@@ -37,7 +37,7 @@ export async function fetchFrequent() {
 export async function toggleFavorite(dish, next) {
   const value = next ?? !dish.is_favorite;
   const r = await submit({ type: 'update', table: 'dishes', row: { is_favorite: value }, match: { id: dish.id } },
-    { label: `收藏 ${dish.name}` });
+    { label: `收藏 ${dish.name}`, tag: 'dish' });
   if (!r.error) dish.is_favorite = value;
   return r;
 }
@@ -45,7 +45,7 @@ export async function toggleFavorite(dish, next) {
 export async function setActive(dish, next) {
   const value = next ?? !dish.is_active;
   const r = await submit({ type: 'update', table: 'dishes', row: { is_active: value }, match: { id: dish.id } },
-    { label: `${value ? '启用' : '停用'} ${dish.name}` });
+    { label: `${value ? '启用' : '停用'} ${dish.name}`, tag: 'dish' });
   if (!r.error) dish.is_active = value;
   return r;
 }
@@ -67,8 +67,8 @@ export async function saveDish(dish, tagIds = []) {
     is_active: dish.is_active ?? true,
   };
   const r = dish.id
-    ? await submit({ type: 'update', table: 'dishes', row, match: { id: dish.id } }, { label: `更新 ${row.name}` })
-    : await submit({ type: 'insert', table: 'dishes', row: { ...row, id: dish.id || undefined } }, { label: `新增 ${row.name}` });
+    ? await submit({ type: 'update', table: 'dishes', row, match: { id: dish.id } }, { label: `更新 ${row.name}`, tag: 'dish' })
+    : await submit({ type: 'insert', table: 'dishes', row: { ...row, id: dish.id || undefined } }, { label: `新增 ${row.name}`, tag: 'dish' });
   if (!r.error && dish.id && tagIds) await replaceTags(dish.id, tagIds);
   return r;
 }
@@ -88,4 +88,5 @@ export async function removeDish(dish) {
     error.friendly = '这道菜有点餐记录，不能删除。改成「停用」就不会出现在点餐列表里，历史记录也保留。';
   }
   if (error) throw error;
+  announceWrite('dish');
 }

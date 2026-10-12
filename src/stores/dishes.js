@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, reactive, computed } from 'vue';
 import { fetchDishes, toggleFavorite as svcToggleFav, setActive as svcSetActive, saveDish, removeDish } from '../services/dishes';
+import { onSync } from '../lib/sync';
 import { classifyError } from '../config';
 
 export const daysSince = d => (d.last_eaten_at
@@ -8,7 +9,10 @@ export const daysSince = d => (d.last_eaten_at
   : null);
 
 export const useDishStore = defineStore('dishes', () => {
-  const all = ref([]);
+  // 一份数据两个视角：rows 含已停用（菜品管理页要能开关），all 只看在用的（点餐/收藏/随机）
+  // 之前是两次请求各拉一遍，别的设备改了菜之后这两份会新旧不一致，现在一次拉完全靠派生
+  const rows = ref([]);
+  const all = computed(() => rows.value.filter(d => d.is_active));
   const loading = ref(false);
   const error = ref(null);
   const loadedAt = ref(0);
@@ -17,19 +21,34 @@ export const useDishStore = defineStore('dishes', () => {
     ingredientId: null, methodId: null, tag: null, search: '',
   });
 
+  const pull = async () => {
+    rows.value = await fetchDishes({ includeInactive: true });
+    loadedAt.value = Date.now();
+  };
+
   async function load(force = false) {
-    if (!force && all.value.length && Date.now() - loadedAt.value < 60_000) return;
+    if (!force && rows.value.length && Date.now() - loadedAt.value < 60_000) return;
     loading.value = true;
     error.value = null;
     try {
-      all.value = await fetchDishes();
-      loadedAt.value = Date.now();
+      await pull();
     } catch (e) {
       error.value = classifyError(e);
     } finally {
       loading.value = false;
     }
   }
+
+  // 同步轮询走这条路：不翻 loading（列表不会闪一下），也不清 error（本机有旧数据可看）
+  async function sync() {
+    try {
+      await pull();
+      error.value = null;
+    } catch (e) {
+      error.value = classifyError(e);
+    }
+  }
+  onSync(sync, 'dish');
 
   const inSection = computed(() => all.value.filter(d =>
     d.meal_type === filter.mealType &&
@@ -82,21 +101,11 @@ export const useDishStore = defineStore('dishes', () => {
     filter.methodId = null;
   }
 
-  async function toggleFavorite(dish) {
-    const r = await svcToggleFav(dish);
-    if (!r.error) { const hit = all.value.find(d => d.id === dish.id); if (hit) hit.is_favorite = dish.is_favorite; }
-    return r;
-  }
+  // 收藏/停用都不再手动改本地数组：service 把新值写回 dish，而 dish 就是 rows 里的那一行，
+  // all 是它的派生，改完自动重算。多设备同步替换 rows 时也不会出现两份状态对不上
+  const toggleFavorite = svcToggleFav;
 
-  async function setActive(dish, next) {
-    const value = next ?? !dish.is_active;
-    const r = await svcSetActive(dish, value);
-    if (!r.error) {
-      const i = all.value.findIndex(d => d.id === dish.id);
-      if (i >= 0 && !value) all.value.splice(i, 1);   // 停用即离开点餐列表
-    }
-    return r;
-  }
+  const setActive = svcSetActive;
 
   async function save(dish, tagIds) {
     const r = await saveDish(dish, tagIds);
@@ -105,11 +114,15 @@ export const useDishStore = defineStore('dishes', () => {
   }
 
   async function remove(dish) {
-    const r = await removeDish(dish);
-    if (!r.error) await load(true);
-    return r;
+    try {
+      await removeDish(dish);
+      await load(true);
+      return { queued: false };
+    } catch (e) {
+      return { queued: false, error: e };
+    }
   }
 
-  return { all, loading, error, filter, ingredients, methods, visible, favorites, frequent, stale,
-           inSection, load, setSection, toggleFavorite, setActive, save, remove };
+  return { rows, all, loading, error, filter, ingredients, methods, visible, favorites, frequent, stale,
+           inSection, load, sync, setSection, toggleFavorite, setActive, save, remove };
 });

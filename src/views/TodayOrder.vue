@@ -42,6 +42,11 @@
                             : '这一顿是吃过的历史，不能改。要挪菜请点别的日期。' }}</div>
     </div></div>
 
+    <!-- 另一台设备改了这顿：必须先说清楚"不是你点错的"，再展示新内容 -->
+    <div v-if="order.syncNotice" class="pad"><div class="banner info" style="margin-top:10px">
+      <Ic name="swap" :size="16" /><div><b>家里另一台设备动了这一顿</b>{{ order.syncNotice }}</div>
+    </div></div>
+
     <div v-if="notice" class="pad"><div class="banner warn" style="margin-top:10px">
       <Ic name="clock" :size="16" /><div>{{ notice }}</div>
     </div></div>

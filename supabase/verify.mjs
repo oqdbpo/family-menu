@@ -348,29 +348,37 @@ try {
       console.log('  SKIP  过去日期的守卫（这个家没有两天以上的历史订单可试）');
     }
 
-    // 挪到空位可以，挪到已有单的位置要说清原因
-    const o2 = await mk('午餐');
-    await call('/rest/v1/rpc/move_order',
-      { method: 'POST', body: { p_order: o2, p_date: tomorrow, p_meal_type: '晚餐' }, auth: true });
-    const moved = await call(`/rest/v1/meal_orders?select=id,meal_type&meal_date=eq.${tomorrow}&order=created_at`, { auth: true });
-    say('草稿可以挪到别的餐次',
-        moved.some(x => x.id === o1) === false && moved.some(x => x.id === o2 && x.meal_type === '晚餐'),
-        moved.map(x => `${x.meal_type}`).join('+'));
+    // 挪动：明天晚餐此时被 o1 占着，正好当"已有单"的障碍
+    const slotOf = async (meal) => {
+      const rows = await call(`/rest/v1/meal_orders?select=id&meal_date=eq.${tomorrow}&meal_type=eq.${meal}`, { auth: true });
+      return rows[0]?.id || null;
+    };
 
-    const o3 = await mk('早餐');
+    const o2 = await mk('午餐');
+    let movedErr = '';
+    try {
+      await call('/rest/v1/rpc/move_order',
+        { method: 'POST', body: { p_order: o2, p_date: tomorrow, p_meal_type: '早餐' }, auth: true });
+    } catch (e) { movedErr = e.message; }
+    say('草稿挪进空位成功', movedErr === '' && (await slotOf('早餐')) === o2 && (await slotOf('午餐')) === null,
+        movedErr || `早餐=${(await slotOf('早餐')) === o2 ? 'o2' : '?'} 午餐=${(await slotOf('午餐')) ? '还占着' : '空'}`);
+
+    const o3 = await mk('其他');
     let clash = '';
     try {
       await call('/rest/v1/rpc/move_order',
         { method: 'POST', body: { p_order: o3, p_date: tomorrow, p_meal_type: '晚餐' }, auth: true });
     } catch (e) { clash = e.message; }
     say('挪到已有单的位置 → 拒绝并点名是哪一顿', /已经有一单/.test(clash), clash || '没报错，两单被并了');
+    say('被拒绝时两边都没动', (await slotOf('晚餐')) === o1 && (await slotOf('其他')) === o3,
+        `晚餐=${(await slotOf('晚餐')) === o1 ? 'o1' : '?'} 其他=${(await slotOf('其他')) === o3 ? 'o3' : '?'}`);
 
-    // 已确认的不许挪，必须先取消——"确认即冻结"这条留着
+    // 已确认的不许挪，必须先取消——"确认即冻结"这条留着（指向刚腾空的午餐，避开障碍干扰）
     await call('/rest/v1/rpc/confirm_order', { method: 'POST', body: { p_order: o3 }, auth: true });
     let frozen = '';
     try {
       await call('/rest/v1/rpc/move_order',
-        { method: 'POST', body: { p_order: o3, p_date: tomorrow, p_meal_type: '早餐' }, auth: true });
+        { method: 'POST', body: { p_order: o3, p_date: tomorrow, p_meal_type: '午餐' }, auth: true });
     } catch (e) { frozen = e.message; }
     await call('/rest/v1/rpc/cancel_order', { method: 'POST', body: { p_order: o3 }, auth: true });
     say('已确认的顿不能直接挪，得先取消', /先取消确认/.test(frozen), frozen || '没报错');
