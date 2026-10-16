@@ -1,4 +1,4 @@
-// 把 design/assets 里的菜品插画传到 Supabase Storage，并回填 dishes.image_path
+// 把 设计文件/assets 里的菜品插画传到 Supabase Storage，并回填 dishes.image_path
 //   node supabase/upload-images.mjs
 //
 // 走的是真实用户路径：匿名登录 → join_family → 按 RLS 要求把文件放进
@@ -63,7 +63,7 @@ if (je) { console.error('join_family 失败：', je.message); process.exit(1); }
 const { data: fam } = await sb.from('families').select('id,name').limit(1).single();
 console.log(`家庭 ${fam.name}  ${fam.id}`);
 
-const dir = path.join(ROOT, 'design', 'assets');
+const dir = path.join(ROOT, '设计文件', 'assets');
 let ok = 0, skip = 0;
 for (const [file, dishName] of Object.entries(MAP)) {
   const src = path.join(dir, `${file}.png`);

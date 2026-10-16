@@ -1,5 +1,5 @@
 <template>
-  <!-- 自动生成自 design/preview.html，不要手改；改图标请改设计稿后重跑 node tools/extract.mjs -->
+  <!-- 自动生成自 设计文件/preview.html，不要手改；改图标请改设计稿后重跑 node tools/extract.mjs -->
   <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
 
 <defs>

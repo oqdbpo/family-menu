@@ -15,4 +15,8 @@ dist/
 Thumbs.db
 .idea/
 .vscode/
-design/_raw/
+设计文件/_raw/
+
+# 本地资料：设计稿与文档不进仓库（GitHub 是 public）
+/设计文件/
+/文档/
