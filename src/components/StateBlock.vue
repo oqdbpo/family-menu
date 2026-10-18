@@ -18,10 +18,12 @@
     </div>
   </div>
 
-  <div v-else-if="kind === 'waking'" class="empty">
+  <div v-else-if="kind === 'unreachable'" class="empty">
     <img :src="emptyArt" alt="">
-    <b>正在叫醒厨房</b>
-    <p>这台服务器空闲后被休眠了，通常 30–90 秒醒来。你的草稿已经存在本机，不会丢。</p>
+    <b>连不上服务器</b>
+    <p>刚才那一下没连通境外的数据库。<b>服务器没有在休眠</b>，它一直醒着——
+      问题出在这台设备的网络上：换个网络再试（Wi-Fi 换蜂窝数据，或走你平时用的代理）。
+      不点也没关系，每 45 秒会自动再试一次；草稿存在本机，不会丢。</p>
     <button class="btn p sm" :disabled="busy" @click="$emit('retry')">
       <Ic name="swap" :size="16" />再试一次
     </button>
@@ -50,7 +52,7 @@ import Ic from './Ic.vue';
 import emptyArt from '../assets/img/hero-empty.png';
 
 defineProps({
-  kind: { type: String, default: 'empty' },   // empty | loading | offline | waking | error
+  kind: { type: String, default: 'empty' },   // empty | loading | offline | unreachable | error
   title: String,
   desc: String,
   icon: String,

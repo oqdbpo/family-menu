@@ -10,7 +10,7 @@
 
   <div v-else-if="blocked && !session.family" class="app">
     <div class="empty" style="padding-top:70px">
-      <StateBlock kind="waking" :busy="session.busy" @retry="session.retry()" />
+      <StateBlock kind="unreachable" :busy="session.busy" @retry="session.retry()" />
     </div>
   </div>
 

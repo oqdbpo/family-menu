@@ -131,7 +131,7 @@ const cartLabel = computed(() => {
   if (!it.length) return '还没选，点右边的加号';
   return it.slice(0, 2).map(i => `${i.dish?.name} ×${i.quantity}`).join(' · ') + (it.length > 2 ? ` 等 ${it.length} 道` : '');
 });
-const stateKind = computed(() => (!session.online ? 'offline' : dishes.error === 'offline' ? 'waking' : 'error'));
+const stateKind = computed(() => (!session.online ? 'offline' : dishes.error === 'offline' ? 'unreachable' : 'error'));
 
 onMounted(() => { dishes.load(); order.load(); });
 </script>
